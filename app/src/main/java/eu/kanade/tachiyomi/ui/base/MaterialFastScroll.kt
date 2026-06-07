@@ -124,6 +124,15 @@ open class MaterialFastScroll @JvmOverloads constructor(context: Context, attrs:
         }
     }
 
+    /**
+     * Safe override: the parent FastScroller calls bubbleTextCreator.onCreateBubbleText()
+     * but bubbleTextCreator is never set, causing NPE. We set the text directly on the
+     * bubble TextView instead.
+     */
+    override fun updateBubbleText(position: Int) {
+        (bubble as? android.widget.TextView)?.text = position.toString()
+    }
+
     override fun setRecyclerViewPosition(y: Float) {
         if (recyclerView != null) {
             val targetPos = getTargetPos(y)
