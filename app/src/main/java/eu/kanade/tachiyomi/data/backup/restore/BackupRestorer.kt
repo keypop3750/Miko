@@ -5,6 +5,7 @@ import android.net.Uri
 import eu.kanade.tachiyomi.data.backup.BackupNotifier
 import eu.kanade.tachiyomi.data.backup.restore.restorers.CategoriesBackupRestorer
 import eu.kanade.tachiyomi.data.backup.restore.restorers.MangaBackupRestorer
+import eu.kanade.tachiyomi.data.backup.restore.restorers.NovelBackupRestorer
 import eu.kanade.tachiyomi.data.backup.restore.restorers.PreferenceBackupRestorer
 import eu.kanade.tachiyomi.util.BackupUtil
 import eu.kanade.tachiyomi.util.system.createFileInCacheDir
@@ -21,6 +22,7 @@ class BackupRestorer(
     val notifier: BackupNotifier,
     private val categoriesBackupRestorer: CategoriesBackupRestorer = CategoriesBackupRestorer(),
     private val mangaBackupRestorer: MangaBackupRestorer = MangaBackupRestorer(),
+    private val novelBackupRestorer: NovelBackupRestorer = NovelBackupRestorer(context),
     private val preferenceBackupRestorer: PreferenceBackupRestorer = PreferenceBackupRestorer(context),
 ) {
     private var restoreAmount = 0
@@ -51,12 +53,16 @@ class BackupRestorer(
     private suspend fun performRestore(uri: Uri) {
         val backup = BackupUtil.decodeBackup(context, uri)
 
-        restoreAmount = backup.backupManga.size + 3 // +3 for categories, app prefs, source prefs
+        // Include novel categories + novels in progress count
+        val hasNovelCategories = backup.backupNovelCategories.isNotEmpty()
+        val novelProgressCount = (if (hasNovelCategories) 1 else 0) + backup.backupNovels.size
+        restoreAmount = backup.backupManga.size + 3 + novelProgressCount // +3 for manga categories, app prefs, source prefs
 
-        sourceMapping = backup.backupSources.associate { it.sourceId to it.name }
+        sourceMapping = backup.backupSources.associate { it.sourceId to it.name } +
+            backup.backupNovelSources.associate { it.sourceId to it.name }
 
         coroutineScope {
-            // Restore categories
+            // Restore manga categories
             if (backup.backupCategories.isNotEmpty()) {
                 ensureActive()
                 categoriesBackupRestorer.restoreCategories(backup.backupCategories) {
@@ -89,6 +95,30 @@ class BackupRestorer(
                     onError = { manga, e ->
                         val sourceName = sourceMapping[manga.source] ?: manga.source.toString()
                         errors.add(Date() to "${manga.title} [$sourceName]: ${e.message}")
+                    },
+                )
+            }
+
+            // Restore novel categories
+            if (hasNovelCategories) {
+                ensureActive()
+                restoreProgress += 1
+                showRestoreProgress(restoreProgress, restoreAmount, context.getString(MR.strings.novel_entries))
+            }
+
+            // Restore novels
+            if (backup.backupNovels.isNotEmpty()) {
+                ensureActive()
+                novelBackupRestorer.restoreNovels(
+                    backupNovels = backup.backupNovels,
+                    backupCategories = backup.backupNovelCategories,
+                    onComplete = { novel ->
+                        restoreProgress += 1
+                        showRestoreProgress(restoreProgress, restoreAmount, novel.title)
+                    },
+                    onError = { novel, e ->
+                        val sourceName = sourceMapping[novel.source] ?: novel.source.toString()
+                        errors.add(Date() to "${novel.title} [$sourceName]: ${e.message}")
                     },
                 )
             }

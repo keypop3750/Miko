@@ -15,6 +15,11 @@ data class Backup(
     @ProtoNumber(101) var backupSources: List<BackupSource> = emptyList(),
     @ProtoNumber(104) var backupPreferences: List<BackupPreference> = emptyList(),
     @ProtoNumber(105) var backupSourcePreferences: List<BackupSourcePreferences> = emptyList(),
+
+    // Novel fields — high ProtoNumber so legacy apps silently ignore them
+    @ProtoNumber(200) var backupNovels: List<BackupNovel> = emptyList(),
+    @ProtoNumber(201) var backupNovelCategories: List<BackupNovelCategory> = emptyList(),
+    @ProtoNumber(202) var backupNovelSources: List<BackupSource> = emptyList(),
 ) {
 
     companion object {

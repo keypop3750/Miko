@@ -27,7 +27,8 @@ class BackupFileValidator(
             throw IllegalStateException(e)
         }
 
-        val sources = backup.backupSources.associate { it.sourceId to it.name }
+        val sources = backup.backupSources.associate { it.sourceId to it.name } +
+            backup.backupNovelSources.associate { it.sourceId to it.name }
         val missingSources = sources
             .filter { sourceManager.get(it.key) == null }
             .map { sourceManager.getOrStub(it.key).name }

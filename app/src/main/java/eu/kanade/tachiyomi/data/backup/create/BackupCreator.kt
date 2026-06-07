@@ -12,9 +12,11 @@ import eu.kanade.tachiyomi.data.backup.models.BackupSource
 import eu.kanade.tachiyomi.data.backup.models.BackupSourcePreferences
 import eu.kanade.tachiyomi.data.backup.create.creators.CategoriesBackupCreator
 import eu.kanade.tachiyomi.data.backup.create.creators.MangaBackupCreator
+import eu.kanade.tachiyomi.data.backup.create.creators.NovelBackupCreator
 import eu.kanade.tachiyomi.data.backup.create.creators.PreferenceBackupCreator
 import eu.kanade.tachiyomi.data.backup.create.creators.SourcesBackupCreator
 import eu.kanade.tachiyomi.data.backup.models.Backup
+import eu.kanade.tachiyomi.source.SourceManager
 import eu.kanade.tachiyomi.domain.manga.models.Manga
 import java.io.FileOutputStream
 import java.time.Instant
@@ -33,9 +35,11 @@ class BackupCreator(
     val context: Context,
     private val categoriesBackupCreator: CategoriesBackupCreator = CategoriesBackupCreator(),
     private val mangaBackupCreator: MangaBackupCreator = MangaBackupCreator(),
+    private val novelBackupCreator: NovelBackupCreator = NovelBackupCreator(context),
     private val preferenceBackupCreator: PreferenceBackupCreator = PreferenceBackupCreator(),
     private val sourcesBackupCreator: SourcesBackupCreator = SourcesBackupCreator(),
     private val getManga: GetManga = Injekt.get(),
+    private val sourceManager: SourceManager = Injekt.get(),
 ) {
 
     val parser = ProtoBuf
@@ -74,12 +78,16 @@ class BackupCreator(
 
             val readNotFavorites = if (options.readManga) getManga.awaitReadNotFavorites() else emptyList()
             val backupManga = backupMangas(getManga.awaitFavorites() + readNotFavorites, options)
+            val (backupNovels, backupNovelCategories) = novelBackupCreator(options)
             val backup = Backup(
                 backupManga = backupManga,
                 backupCategories = backupCategories(options),
                 backupSources = backupSources(backupManga),
                 backupPreferences = backupAppPreferences(options),
                 backupSourcePreferences = backupSourcePreferences(options),
+                backupNovels = backupNovels,
+                backupNovelCategories = backupNovelCategories,
+                backupNovelSources = backupNovelSources(backupNovels),
             )
 
             val byteArray = parser.encodeToByteArray(Backup.serializer(), backup)
@@ -122,6 +130,16 @@ class BackupCreator(
 
     private fun backupSources(mangas: List<BackupManga>): List<BackupSource> {
         return sourcesBackupCreator(mangas)
+    }
+
+    private fun backupNovelSources(novels: List<eu.kanade.tachiyomi.data.backup.models.BackupNovel>): List<BackupSource> {
+        return novels
+            .asSequence()
+            .map { it.source }
+            .distinct()
+            .map { sourceManager.getOrStub(it) }
+            .map { BackupSource.copyFrom(it) }
+            .toList()
     }
 
     private fun backupAppPreferences(options: BackupOptions): List<BackupPreference> {
