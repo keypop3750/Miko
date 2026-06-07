@@ -86,18 +86,21 @@ class SwipesRepository(
             Logger.w { "📚 [SWIPES] No HTTP manga sources available for fetching recommendations" }
             return@withContext emptyList()
         }
-        
-        Logger.d { "📚 [SWIPES] Final source list: ${sources.size} sources (${sources.groupBy { it.lang }.mapValues { it.value.size }})" }
-        
+
+        // SPEED OPTIMIZATION: Only query a subset of sources to match extension-browse speed.
+        // Extension browse loads from 1 source; we pick a random 8 to get variety without
+        // waiting for 50+ sources to respond.
+        val selectedSources = sources.shuffled().take(8)
+        Logger.d { "📚 [SWIPES] Querying ${selectedSources.size}/${sources.size} sources for speed" }
+
         // PERFORMANCE OPTIMIZATION: Limit concurrent source fetches to prevent cache contention
-        // Logs showed "Long monitor contention" with 164ms+ blocking when too many parallel requests
-        val maxConcurrentSources = 8
+        val maxConcurrentSources = 4
         val semaphore = kotlinx.coroutines.sync.Semaphore(maxConcurrentSources)
-        
-        Logger.d { "📚 [SWIPES] 🚀 Fetching with max $maxConcurrentSources concurrent sources (prevents cache bottleneck)" }
-        
+
+        Logger.d { "📚 [SWIPES] 🚀 Fetching with max $maxConcurrentSources concurrent sources" }
+
         // Fetch from each source in parallel with timeout AND concurrency control
-        val results = sources.map { source ->
+        val results = selectedSources.map { source ->
             async {
                 // Acquire semaphore to limit concurrency
                 semaphore.acquire()

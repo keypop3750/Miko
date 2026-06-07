@@ -105,7 +105,7 @@ class SwipesPresenter(
     private var isSearchActive = false
     
     // Settings (TODO Phase 4.3: Load from preferences)
-    private var preloadCount = 30
+    private var preloadCount = 15
     private var refreshThreshold = 5
     
     // Pending swipe state for restoration if user navigates away
@@ -139,26 +139,14 @@ class SwipesPresenter(
                 // Try to restore cached queue
                 val cachedQueue = restoreQueueFromCache()
                 if (cachedQueue.isNotEmpty()) {
-                    Logger.d { "📱 [SWIPES] Restored ${cachedQueue.size} cards from cache" }
+                    Logger.d { "📱 [SWIPES] Restored ${cachedQueue.size} cards from cache - showing immediately" }
                     currentMangaUrls.clear()
                     currentMangaUrls.addAll(cachedQueue.map { it.url })
-                    
-                    // CRITICAL FIX: Enhance cached cards with metadata before displaying
-                    Logger.d { "📊 [METADATA] Enhancing ${cachedQueue.size} cached cards with metadata..." }
-                    Logger.d { "📊 [METADATA] MetadataEnhancementService instance: $metadataEnhancementService" }
-                    val enhancedCachedCards = try {
-                        Logger.d { "📊 [METADATA] Calling enhanceCards() for cached cards..." }
-                        val result = metadataEnhancementService.enhanceCards(cachedQueue)
-                        Logger.d { "📊 [METADATA] Cached cards enhancement completed, ${result.count { it.metadataEnhanced }} cards enhanced" }
-                        result
-                    } catch (e: Exception) {
-                        Logger.e(e) { "📊 [METADATA] Cached cards enhancement failed with exception: ${e.message}" }
-                        cachedQueue // Fallback to unenhanced on error
-                    }
-                    
-                    _cards.value = enhancedCachedCards
-                    _uiState.value = SwipesUiState.Success(enhancedCachedCards.size)
-                    
+
+                    // Show cached cards IMMEDIATELY without blocking on metadata enhancement
+                    _cards.value = cachedQueue
+                    _uiState.value = SwipesUiState.Success(cachedQueue.size)
+
                     // Prefetch details for restored cards (starting from position 0)
                     prefetchUpcomingCards(0)
                 } else {

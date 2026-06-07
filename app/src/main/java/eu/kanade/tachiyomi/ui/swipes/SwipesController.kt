@@ -7,6 +7,7 @@ import android.view.MenuInflater
 import android.view.MenuItem
 import android.view.View
 import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.widget.SearchView
 import androidx.recyclerview.widget.DefaultItemAnimator
 import co.touchlab.kermit.Logger
 import com.yuyakaido.android.cardstackview.CardStackLayoutManager
@@ -18,6 +19,8 @@ import eu.kanade.tachiyomi.R
 import eu.kanade.tachiyomi.databinding.SwipesControllerBinding
 import eu.kanade.tachiyomi.ui.base.controller.BaseLegacyController
 import eu.kanade.tachiyomi.ui.main.BottomSheetController
+import eu.kanade.tachiyomi.ui.main.FloatingSearchInterface
+import eu.kanade.tachiyomi.ui.main.RootSearchInterface
 import eu.kanade.tachiyomi.util.view.activityBinding
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -41,6 +44,8 @@ import uy.kohesive.injekt.api.get
 class SwipesController(bundle: Bundle? = null) :
     BaseLegacyController<SwipesControllerBinding>(bundle),
     CardStackListener,
+    RootSearchInterface,
+    FloatingSearchInterface,
     BottomSheetController {
 
     init {
@@ -210,6 +215,37 @@ class SwipesController(bundle: Bundle? = null) :
 
     override fun onCreateOptionsMenu(menu: Menu, inflater: MenuInflater) {
         inflater.inflate(R.menu.swipes_menu, menu)
+
+        // Setup SearchView
+        val searchItem = menu.findItem(R.id.action_search)
+        val searchView = searchItem?.actionView as? SearchView
+
+        searchView?.apply {
+            queryHint = "Search manga..."
+            maxWidth = Integer.MAX_VALUE
+
+            setOnQueryTextListener(object : SearchView.OnQueryTextListener {
+                override fun onQueryTextSubmit(query: String?): Boolean {
+                    query?.let {
+                        Logger.d { "🔍 [SEARCH] Query submitted: $it" }
+                        presenter.searchManga(it)
+                        clearFocus()
+                    }
+                    return true
+                }
+
+                override fun onQueryTextChange(newText: String?): Boolean = false
+            })
+        }
+
+        searchItem?.setOnActionExpandListener(object : MenuItem.OnActionExpandListener {
+            override fun onMenuItemActionExpand(item: MenuItem): Boolean = true
+
+            override fun onMenuItemActionCollapse(item: MenuItem): Boolean {
+                presenter.clearSearch()
+                return true
+            }
+        })
     }
 
     override fun onOptionsItemSelected(item: MenuItem): Boolean {

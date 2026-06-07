@@ -264,22 +264,39 @@ class SwipeCardAdapter : RecyclerView.Adapter<SwipeCardAdapter.SwipeCardViewHold
             // Reset lastScrollY when setting up (for new card binding)
             lastScrollY = 0
 
-            // Prevent CardStackView from intercepting vertical scrolls on this card
-            // so the NestedScrollView can scroll the description properly
+            // Smart touch handling: only intercept vertical scrolls so horizontal
+            // card swipes still work through the CardStackView.
+            val touchSlop = android.view.ViewConfiguration.get(binding.scrollView.context).scaledTouchSlop
+            var startX = 0f
+            var startY = 0f
+            var isScrollingVertically = false
+
             binding.scrollView.setOnTouchListener { _, event ->
                 when (event.actionMasked) {
-                    android.view.MotionEvent.ACTION_DOWN,
+                    android.view.MotionEvent.ACTION_DOWN -> {
+                        startX = event.x
+                        startY = event.y
+                        isScrollingVertically = false
+                    }
                     android.view.MotionEvent.ACTION_MOVE -> {
-                        binding.scrollView.parent?.requestDisallowInterceptTouchEvent(true)
+                        val dx = kotlin.math.abs(event.x - startX)
+                        val dy = kotlin.math.abs(event.y - startY)
+                        if (!isScrollingVertically && (dx > touchSlop || dy > touchSlop)) {
+                            isScrollingVertically = dy > dx // vertical scroll detected
+                            if (isScrollingVertically) {
+                                binding.scrollView.parent?.requestDisallowInterceptTouchEvent(true)
+                            }
+                        }
                     }
                     android.view.MotionEvent.ACTION_UP,
                     android.view.MotionEvent.ACTION_CANCEL -> {
                         binding.scrollView.parent?.requestDisallowInterceptTouchEvent(false)
+                        isScrollingVertically = false
                     }
                 }
                 false
             }
-            
+
             binding.scrollView.setOnScrollChangeListener { _, _, scrollY, _, oldScrollY ->
                 val maxScroll = 400f
                 val progress = (scrollY.toFloat() / maxScroll).coerceIn(0f, 1f)
