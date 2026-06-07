@@ -20,7 +20,9 @@ import eu.kanade.tachiyomi.ui.base.controller.BaseCoroutineController
 import eu.kanade.tachiyomi.ui.main.MainActivity
 import eu.kanade.tachiyomi.ui.main.SearchActivity
 import eu.kanade.tachiyomi.ui.main.SearchControllerInterface
+import eu.kanade.tachiyomi.source.isNovelSource
 import eu.kanade.tachiyomi.ui.manga.MangaDetailsController
+import eu.kanade.tachiyomi.ui.novel.details.NovelDetailsControllerNew
 import eu.kanade.tachiyomi.ui.source.browse.BrowseSourceController
 import eu.kanade.tachiyomi.util.addOrRemoveToFavorites
 import eu.kanade.tachiyomi.util.system.extensionIntentForText
@@ -113,12 +115,41 @@ open class GlobalSearchController(
      * @param manga clicked item containing manga information.
      */
     override fun onMangaClick(manga: Manga) {
-        // Open MangaController.
+        val source = sourceManager.getOrStub(manga.source) as? CatalogueSource
         lastPosition = adapter?.currentItems?.indexOfFirst { it.source.id == manga.source } ?: -1
-        router.pushController(
-            MangaDetailsController(manga, true, shouldLockIfNeeded = activity is SearchActivity)
-                .withFadeTransaction(),
-        )
+
+        if (source?.isNovelSource() == true) {
+            // Route novel sources to NovelDetailsControllerNew
+            val novel = yokai.domain.novel.Novel(
+                id = manga.id ?: -1,
+                source = manga.source,
+                url = manga.url,
+                title = manga.title,
+                artist = manga.artist,
+                author = manga.author,
+                description = manga.description,
+                genre = manga.genre,
+                status = manga.status.toLong(),
+                thumbnailUrl = manga.thumbnail_url,
+                favorite = manga.favorite,
+                lastUpdate = manga.last_update,
+                initialized = manga.initialized,
+                viewerFlags = manga.viewer_flags.toLong(),
+                chapterFlags = manga.chapter_flags.toLong(),
+                coverLastModified = manga.cover_last_modified,
+                dateAdded = manga.date_added,
+            )
+            router.pushController(
+                NovelDetailsControllerNew(novel, true)
+                    .withFadeTransaction(),
+            )
+        } else {
+            // Open MangaController for manga sources
+            router.pushController(
+                MangaDetailsController(manga, true, shouldLockIfNeeded = activity is SearchActivity)
+                    .withFadeTransaction(),
+            )
+        }
     }
 
     /**
@@ -377,10 +408,37 @@ open class GlobalSearchController(
             val results = searchResult.firstOrNull()?.results
             if (results != null && searchResult.size == 1 && results.size == 1) {
                 val manga = results.first().manga
-                router.replaceTopController(
-                    MangaDetailsController(manga, true, shouldLockIfNeeded = true)
-                        .withFadeTransaction(),
-                )
+                val source = sourceManager.getOrStub(manga.source) as? CatalogueSource
+                if (source?.isNovelSource() == true) {
+                    val novel = yokai.domain.novel.Novel(
+                        id = manga.id ?: -1,
+                        source = manga.source,
+                        url = manga.url,
+                        title = manga.title,
+                        artist = manga.artist,
+                        author = manga.author,
+                        description = manga.description,
+                        genre = manga.genre,
+                        status = manga.status.toLong(),
+                        thumbnailUrl = manga.thumbnail_url,
+                        favorite = manga.favorite,
+                        lastUpdate = manga.last_update,
+                        initialized = manga.initialized,
+                        viewerFlags = manga.viewer_flags.toLong(),
+                        chapterFlags = manga.chapter_flags.toLong(),
+                        coverLastModified = manga.cover_last_modified,
+                        dateAdded = manga.date_added,
+                    )
+                    router.replaceTopController(
+                        NovelDetailsControllerNew(novel, true)
+                            .withFadeTransaction(),
+                    )
+                } else {
+                    router.replaceTopController(
+                        MangaDetailsController(manga, true, shouldLockIfNeeded = true)
+                            .withFadeTransaction(),
+                    )
+                }
                 return
             } else if (results != null) {
                 (activity as? SearchActivity)?.setFloatingToolbar(true)

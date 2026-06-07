@@ -168,32 +168,39 @@ suspend fun Manga.addOrRemoveToFavorites(
         if (checkForDupes) {
             val duplicateManga = getManga.awaitDuplicateFavorite(this.title, this.source)
             if (duplicateManga != null) {
-                showAddDuplicateDialog(
-                    this,
-                    duplicateManga,
-                    activity,
-                    sourceManager,
-                    controller,
-                    addManga = {
-                        addOrRemoveToFavorites(
-                            preferences,
-                            view,
-                            activity,
-                            sourceManager,
-                            controller,
-                            false,
-                            onMangaAdded,
-                            onMangaMoved,
-                            onMangaDeleted,
-                            scope = scope,
-                        )
-                    },
-                    migrateManga = { source, faved ->
-                        onMangaAdded(source to faved)
-                    },
-                    scope = scope,
-                )
-                return null
+                // Skip duplicate dialog if sources are different types (e.g., manga vs novel)
+                // to avoid false positives from cross-content-type title matches
+                val newSource = sourceManager.getOrStub(this.source)
+                val dupSource = sourceManager.getOrStub(duplicateManga.source)
+                val isSameType = newSource.isNovelSource() == dupSource.isNovelSource()
+                if (isSameType) {
+                    showAddDuplicateDialog(
+                        this,
+                        duplicateManga,
+                        activity,
+                        sourceManager,
+                        controller,
+                        addManga = {
+                            addOrRemoveToFavorites(
+                                preferences,
+                                view,
+                                activity,
+                                sourceManager,
+                                controller,
+                                false,
+                                onMangaAdded,
+                                onMangaMoved,
+                                onMangaDeleted,
+                                scope = scope,
+                            )
+                        },
+                        migrateManga = { source, faved ->
+                            onMangaAdded(source to faved)
+                        },
+                        scope = scope,
+                    )
+                    return null
+                }
             }
         }
 

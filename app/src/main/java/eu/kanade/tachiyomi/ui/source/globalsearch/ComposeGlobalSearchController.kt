@@ -16,7 +16,9 @@ import eu.kanade.tachiyomi.source.SourceManager
 import eu.kanade.tachiyomi.ui.base.controller.BaseComposeController
 import eu.kanade.tachiyomi.ui.main.MainActivity
 import eu.kanade.tachiyomi.ui.main.SearchActivity
+import eu.kanade.tachiyomi.source.isNovelSource
 import eu.kanade.tachiyomi.ui.manga.MangaDetailsController
+import eu.kanade.tachiyomi.ui.novel.details.NovelDetailsControllerNew
 import eu.kanade.tachiyomi.ui.source.browse.BrowseSourceController
 import eu.kanade.tachiyomi.util.addOrRemoveToFavorites
 import eu.kanade.tachiyomi.util.system.launchIO
@@ -93,16 +95,44 @@ class ComposeGlobalSearchController(
     }
     
     /**
-     * Navigate to manga details when a manga is clicked.
+     * Navigate to manga/novel details when a search result is clicked.
      */
     private fun onMangaClick(manga: Manga) {
-        router.pushController(
-            MangaDetailsController(
-                manga = manga,
-                fromCatalogue = true,
-                shouldLockIfNeeded = activity is SearchActivity
-            ).withFadeTransaction()
-        )
+        val source = sourceManager.getOrStub(manga.source) as? CatalogueSource
+
+        if (source?.isNovelSource() == true) {
+            val novel = yokai.domain.novel.Novel(
+                id = manga.id ?: -1,
+                source = manga.source,
+                url = manga.url,
+                title = manga.title,
+                artist = manga.artist,
+                author = manga.author,
+                description = manga.description,
+                genre = manga.genre,
+                status = manga.status.toLong(),
+                thumbnailUrl = manga.thumbnail_url,
+                favorite = manga.favorite,
+                lastUpdate = manga.last_update,
+                initialized = manga.initialized,
+                viewerFlags = manga.viewer_flags.toLong(),
+                chapterFlags = manga.chapter_flags.toLong(),
+                coverLastModified = manga.cover_last_modified,
+                dateAdded = manga.date_added,
+            )
+            router.pushController(
+                NovelDetailsControllerNew(novel, true)
+                    .withFadeTransaction()
+            )
+        } else {
+            router.pushController(
+                MangaDetailsController(
+                    manga = manga,
+                    fromCatalogue = true,
+                    shouldLockIfNeeded = activity is SearchActivity
+                ).withFadeTransaction()
+            )
+        }
     }
     
     /**

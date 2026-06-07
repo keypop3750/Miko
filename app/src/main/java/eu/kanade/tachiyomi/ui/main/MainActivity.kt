@@ -1488,13 +1488,14 @@ open class MainActivity : BaseActivity<MainActivityBinding>() {
 
     private fun setStartingTab() {
         if (this is SearchActivity || !isBindingInitialized) return
-        if (nav.selectedItemId != R.id.nav_browse &&
-            preferences.startingTab().get() >= 0
-        ) {
+        if (preferences.startingTab().get() >= 0) {
             preferences.startingTab().set(
                 when (nav.selectedItemId) {
                     R.id.nav_library -> 0
-                    else -> 1
+                    R.id.nav_recents -> 1
+                    R.id.nav_browse -> 2
+                    R.id.nav_swipes -> 3
+                    else -> 0
                 },
             )
         }
@@ -1503,8 +1504,12 @@ open class MainActivity : BaseActivity<MainActivityBinding>() {
     @IdRes
     private fun startingTab(): Int {
         return when (preferences.startingTab().get()) {
-            0, -1 -> R.id.nav_library
-            1, -2 -> R.id.nav_recents
+            0 -> R.id.nav_library
+            1 -> R.id.nav_recents
+            2 -> R.id.nav_browse
+            3 -> R.id.nav_swipes
+            -1 -> R.id.nav_library
+            -2 -> R.id.nav_recents
             -3 -> R.id.nav_browse
             else -> R.id.nav_library
         }

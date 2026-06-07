@@ -165,12 +165,7 @@ class NovelReaderViewModel(
                 android.util.Log.d("NovelReaderViewModel", "Getting provider for source ${novel.source}...")
                 val sourceInstance = sourceManager.getOrStub(novel.source)
                 currentProvider = when (sourceInstance) {
-                    is eu.kanade.tachiyomi.source.novel.NovelSourceWrapper -> {
-                        // Use reflection to access the private novelProvider field
-                        val field = sourceInstance.javaClass.getDeclaredField("novelProvider")
-                        field.isAccessible = true
-                        field.get(sourceInstance) as? NovelMainAPI
-                    }
+                    is eu.kanade.tachiyomi.source.novel.NovelSourceWrapper -> sourceInstance.novelProvider
                     is NovelMainAPI -> sourceInstance
                     else -> null
                 }

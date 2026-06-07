@@ -114,11 +114,8 @@ class NovelDetailsPresenter(
             // Unwrap NovelSourceWrapper to get the underlying NovelMainAPI
             when (sourceInstance) {
                 is eu.kanade.tachiyomi.source.novel.NovelSourceWrapper -> {
-                    // Use reflection to access the private novelProvider field
-                    val field = sourceInstance.javaClass.getDeclaredField("novelProvider")
-                    field.isAccessible = true
-                    val unwrapped = field.get(sourceInstance) as? NovelMainAPI
-                    logger.d { "Unwrapped NovelSourceWrapper to: ${unwrapped?.javaClass?.simpleName}" }
+                    val unwrapped = sourceInstance.novelProvider
+                    logger.d { "Unwrapped NovelSourceWrapper to: ${unwrapped.javaClass.simpleName}" }
                     unwrapped
                 }
                 is NovelMainAPI -> sourceInstance
