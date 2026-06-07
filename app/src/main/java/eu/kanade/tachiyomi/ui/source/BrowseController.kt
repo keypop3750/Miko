@@ -1,5 +1,6 @@
-package eu.kanade.tachiyomi.ui.source
+﻿package eu.kanade.tachiyomi.ui.source
 
+import android.animation.ValueAnimator
 import android.app.Activity
 import android.os.Build
 import android.os.Parcelable
@@ -10,8 +11,17 @@ import android.view.MenuItem
 import android.view.RoundedCorner
 import android.view.View
 import android.view.ViewGroup
+import android.view.animation.DecelerateInterpolator
 import androidx.activity.BackEventCompat
 import androidx.appcompat.widget.SearchView
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.ViewCompositionStrategy
+import androidx.compose.ui.platform.rememberNestedScrollInteropConnection
+import androidx.core.animation.doOnEnd
 import androidx.core.graphics.ColorUtils
 import androidx.core.view.doOnNextLayout
 import androidx.core.view.isInvisible
@@ -19,6 +29,7 @@ import androidx.core.view.isVisible
 import androidx.core.view.updateLayoutParams
 import androidx.core.view.updatePaddingRelative
 import androidx.recyclerview.widget.RecyclerView
+import co.touchlab.kermit.Logger
 import com.bluelinelabs.conductor.ControllerChangeHandler
 import com.bluelinelabs.conductor.ControllerChangeType
 import com.google.android.material.bottomsheet.BottomSheetBehavior
@@ -32,6 +43,7 @@ import eu.kanade.tachiyomi.databinding.BrowseControllerBinding
 import eu.kanade.tachiyomi.source.CatalogueSource
 import eu.kanade.tachiyomi.source.LocalSource
 import eu.kanade.tachiyomi.source.Source
+import eu.kanade.tachiyomi.ui.animation.MorphTransitionCoordinator
 import eu.kanade.tachiyomi.ui.base.controller.BaseLegacyController
 import eu.kanade.tachiyomi.ui.extension.ExtensionFilterController
 import eu.kanade.tachiyomi.ui.main.BottomSheetController
@@ -43,6 +55,8 @@ import eu.kanade.tachiyomi.ui.setting.controllers.SettingsSourcesController
 import eu.kanade.tachiyomi.ui.source.browse.BrowseSourceController
 import eu.kanade.tachiyomi.ui.source.globalsearch.GlobalSearchController
 import eu.kanade.tachiyomi.util.system.dpToPx
+import yokai.core.content.ContentType
+import yokai.core.mode.ModeManager
 import eu.kanade.tachiyomi.util.system.getBottomGestureInsets
 import eu.kanade.tachiyomi.util.system.getResourceColor
 import eu.kanade.tachiyomi.util.system.openInBrowser
@@ -63,23 +77,32 @@ import eu.kanade.tachiyomi.util.view.snack
 import eu.kanade.tachiyomi.util.view.toolbarHeight
 import eu.kanade.tachiyomi.util.view.updateGradiantBGRadius
 import eu.kanade.tachiyomi.util.view.withFadeTransaction
+import eu.kanade.tachiyomi.util.view.withMorphTransition
 import eu.kanade.tachiyomi.widget.LinearLayoutManagerAccurateOffset
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.launch
 import kotlinx.parcelize.Parcelize
 import uy.kohesive.injekt.injectLazy
 import yokai.domain.base.BasePreferences
 import yokai.domain.base.BasePreferences.ExtensionInstaller
 import yokai.i18n.MR
+import yokai.presentation.browse.BrowseScreen
+import yokai.presentation.browse.BrowseSourceItem
+import yokai.presentation.browse.BrowseViewModel
 import yokai.presentation.extension.repo.ExtensionRepoController
+import yokai.presentation.theme.YokaiTheme
 import yokai.util.lang.getString
 import java.util.*
 import kotlin.math.max
 
 /**
  * This controller shows and manages the different catalogues enabled by the user.
- * This controller should only handle UI actions, IO actions should be done by [SourcePresenter]
+ * Uses Compose for the source list to enable reactive theme updates on mode changes.
  * [SourceAdapter.SourceListener] call function data on browse item click.
  */
 class BrowseController :
@@ -90,15 +113,27 @@ class BrowseController :
     FloatingSearchInterface,
     BottomSheetController {
 
+    private val logger = Logger.withTag("BrowseController")
+    
     private val basePreferences: BasePreferences by injectLazy()
 
     /**
      * Application preferences.
      */
     private val preferences: PreferencesHelper by injectLazy()
+    
+    /**
+     * ViewModel for Compose-based source list.
+     * Exposes sources as StateFlow for reactive Compose observation.
+     */
+    private val browseViewModel: BrowseViewModel by lazy { BrowseViewModel() }
+
+    companion object {
+        const val HELP_URL = "https://tachiyomi.org/docs/guides/source-migration"
+    }
 
     /**
-     * Adapter containing sources.
+     * Adapter containing sources (kept for compatibility, but unused with Compose).
      */
     private var adapter: SourceAdapter? = null
 
@@ -106,6 +141,9 @@ class BrowseController :
         private set
 
     var headerHeight = 0
+    
+    // StateFlow for Compose to observe header height changes
+    private val headerHeightState = MutableStateFlow(0)
 
     var showingExtensions = false
 
@@ -137,6 +175,7 @@ class BrowseController :
 
     override fun onViewCreated(view: View) {
         super.onViewCreated(view)
+        
         val isReturning = adapter != null
         adapter = SourceAdapter(this)
         // Create binding.sourceRecycler and set adapter.
@@ -183,6 +222,21 @@ class BrowseController :
         }
 
         binding.bottomSheet.root.onCreate(this)
+        
+        // Update bottom sheet state for current mode (initial state only)
+        updateBottomSheetForMode()
+        
+        // Mode observer for source list and bottom sheet updates
+        viewScope.launch {
+            yokai.core.mode.ModeManager.currentMode
+                .drop(1) // Skip initial value (already handled above)
+                .collectLatest { mode ->
+                    // Update sources for new mode
+                    presenter.updateSources()
+                    // Update bottom sheet
+                    updateBottomSheetForMode()
+                }
+        }
 
         basePreferences.extensionInstaller().changes()
             .drop(1)
@@ -384,7 +438,6 @@ class BrowseController :
     fun updateTitleAndMenu() {
         if (isControllerVisible) {
             val activity = (activity as? MainActivity) ?: return
-            activityBinding?.appBar?.isInvisible = showingExtensions
             (activity as? MainActivity)?.setStatusBarColorTransparent(showingExtensions)
             updateSheetMenu()
         }
@@ -404,9 +457,9 @@ class BrowseController :
         }
         binding.bottomSheet.pill.alpha = (1 - progress) * 0.25f
         binding.bottomSheet.sheetToolbar.alpha = progress
-        if (isControllerVisible) {
-            activityBinding?.appBar?.alpha = (1 - progress * 3) + 0.5f
-        }
+        
+        // Send progress to BrowseViewModel so Compose YokaiSearchBar can fade
+        browseViewModel.updateSheetProgress(progress)
 
         binding.bottomSheet.root.updateGradiantBGRadius(
             ogRadius,
@@ -478,6 +531,17 @@ class BrowseController :
         if (!isBindingInitialized) return
         binding.bottomSheet.root.sheetBehavior?.collapse()
     }
+    
+    /**
+     * Update the bottom sheet based on current mode.
+     * In novel mode, the bottom sheet stays visible but shows novel extensions.
+     */
+    private fun updateBottomSheetForMode() {
+        if (!isBindingInitialized) return
+        // Bottom sheet stays visible in both modes - the tabs will show mode-appropriate content
+        // The ExtensionBottomSheet will handle mode-awareness internally
+        binding.bottomSheet.root.updateForMode()
+    }
 
     override fun toggleSheet() {
         if (!binding.bottomSheet.root.sheetBehavior.isCollapsed()) {
@@ -540,16 +604,14 @@ class BrowseController :
             binding.bottomSheet.root.presenter.refreshExtensions()
             presenter.updateSources()
             if (type.isEnter && isControllerVisible) {
-                activityBinding?.appBar?.doOnNextLayout {
-                    activityBinding?.appBar?.y = 0f
-                    activityBinding?.appBar?.updateAppBarAfterY(binding.sourceRecycler)
-                }
                 updateSheetMenu()
             }
         }
         if (!type.isEnter) {
             binding.bottomSheet.root.canExpand = false
             activityBinding?.appBar?.alpha = 1f
+            // Show app bar when leaving Browse
+            activityBinding?.appBar?.isVisible = true
             activityBinding?.appBar?.isInvisible = router.isCompose
             binding.bottomSheet.sheetToolbar.menu.findItem(R.id.action_search)?.let { searchItem ->
                 val searchView = searchItem.actionView as SearchView
@@ -568,6 +630,8 @@ class BrowseController :
             binding.bottomSheet.root.canExpand = true
             setBottomPadding()
             updateTitleAndMenu()
+            // Notify ViewModel that we're visible - triggers YokaiTheme SideEffect to update status bar
+            browseViewModel.onControllerVisible()
         }
     }
 
@@ -583,44 +647,48 @@ class BrowseController :
     }
 
     override fun onItemClick(view: View, position: Int): Boolean {
+        // Legacy adapter click - no longer used with Compose source list
         val item = adapter?.getItem(position) as? SourceItem ?: return false
         val source = item.source
-        // Open the catalogue view.
         openCatalogue(source, BrowseSourceController(source))
         return false
     }
 
     fun hideCatalogue(position: Int) {
+        // Legacy method - kept for interface compatibility
         val source = (adapter?.getItem(position) as? SourceItem)?.source ?: return
+        hideSource(source.id)
+    }
+    
+    /**
+     * Hide a source by ID. Used by both legacy adapter and Compose UI.
+     */
+    private fun hideSource(sourceId: Long) {
         val current = preferences.hiddenSources().get()
-        preferences.hiddenSources().set(current + source.id.toString())
-
-        presenter.updateSources()
+        preferences.hiddenSources().set(current + sourceId.toString())
+        
+        // ViewModel will automatically refresh sources
+        browseViewModel.hideSource(sourceId)
 
         snackbar = view?.snack(MR.strings.source_hidden, Snackbar.LENGTH_INDEFINITE) {
             anchorView = binding.bottomSheet.root
             setAction(MR.strings.undo) {
                 val newCurrent = preferences.hiddenSources().get()
-                preferences.hiddenSources().set(newCurrent - source.id.toString())
-                presenter.updateSources()
+                preferences.hiddenSources().set(newCurrent - sourceId.toString())
+                browseViewModel.unhideSource(sourceId)
             }
         }
         (activity as? MainActivity)?.setUndoSnackBar(snackbar)
     }
 
     private fun pinCatalogue(source: Source, isPinned: Boolean) {
-        val current = preferences.pinnedCatalogues().get()
-        if (isPinned) {
-            preferences.pinnedCatalogues().set(current - source.id.toString())
-        } else {
-            preferences.pinnedCatalogues().set(current + source.id.toString())
-        }
-
-        presenter.updateSources()
+        // Use ViewModel which handles preference updates and source refresh
+        browseViewModel.pinSource(source.id)
     }
 
     /**
      * Called when browse is clicked in [SourceAdapter]
+     * Legacy method for adapter compatibility.
      */
     override fun onPinClick(position: Int) {
         val item = adapter?.getItem(position) as? SourceItem ?: return
@@ -631,6 +699,7 @@ class BrowseController :
 
     /**
      * Called when latest is clicked in [SourceAdapter]
+     * Legacy method for adapter compatibility.
      */
     override fun onLatestClick(position: Int) {
         val item = adapter?.getItem(position) as? SourceItem ?: return
@@ -641,6 +710,11 @@ class BrowseController :
      * Opens a catalogue with the given controller.
      */
     private fun openCatalogue(source: CatalogueSource, controller: BrowseSourceController) {
+        // Auto-switch to novel mode when opening a novel source
+        if (source is eu.kanade.tachiyomi.source.novel.NovelSourceWrapper) {
+            ModeManager.setMode(ContentType.NOVEL)
+        }
+
         if (!preferences.incognitoMode().get()) {
             preferences.lastUsedCatalogueSource().set(source.id)
             if (source !is LocalSource) {
@@ -653,6 +727,8 @@ class BrowseController :
                     .set(sortedList.take(2).toSet())
             }
         }
+
+        activityBinding?.searchToolbar?.searchQueryHint = "Search ${source.name}"
         router.pushController(controller.withFadeTransaction())
     }
 
@@ -673,6 +749,8 @@ class BrowseController :
     override fun onCreateOptionsMenu(menu: Menu, inflater: MenuInflater) {
         // Inflate menu
         inflater.inflate(R.menu.catalogue_main, menu)
+
+        setupModeToggle(menu)
 
         // Initialize search option.
         val searchView = activityBinding?.searchToolbar?.searchView
@@ -709,9 +787,78 @@ class BrowseController :
             R.id.action_sources_settings -> {
                 router.pushController(SettingsBrowseController().withFadeTransaction())
             }
+            R.id.action_mode_toggle -> {
+                // Get the anchor view for the circular reveal animation
+                // Use multiple strategies to find the menu item view
+                val toolbar = activityBinding?.toolbar
+                val anchorView = toolbar?.let { tb ->
+                    // First try direct findViewById on toolbar
+                    tb.findViewById<View>(R.id.action_mode_toggle)
+                        ?: run {
+                            // Fallback: iterate toolbar children to find ActionMenuItemView
+                            val actionMenuView = (0 until tb.childCount)
+                                .map { tb.getChildAt(it) }
+                                .find { it is androidx.appcompat.widget.ActionMenuView }
+                                as? androidx.appcompat.widget.ActionMenuView
+                            actionMenuView?.let { amv ->
+                                (0 until amv.childCount)
+                                    .map { amv.getChildAt(it) }
+                                    .find { child -> child.id == R.id.action_mode_toggle }
+                            }
+                        }
+                }
+                
+                // Get the root view for the animation
+                val rootView = activityBinding?.mainContent ?: view?.parent as? ViewGroup
+                
+                if (rootView != null && activity != null) {
+                    // Provide immediate visual feedback then animate
+                    eu.kanade.tachiyomi.util.view.ThemeTransitionHelper.animateButtonPress(anchorView) {
+                        eu.kanade.tachiyomi.util.view.ThemeTransitionHelper.animateThemeChange(
+                            activity = activity!!,
+                            anchorView = anchorView,
+                            rootView = rootView,
+                            onThemeChange = { yokai.core.mode.ModeManager.toggleMode() },
+                            duration = 250L  // Faster animation
+                        )
+                    }
+                } else {
+                    yokai.core.mode.ModeManager.toggleMode()
+                }
+                return true
+            }
             else -> return super.onOptionsItemSelected(item)
         }
         return true
+    }
+
+    private fun setupModeToggle(menu: Menu) {
+        val modeToggle = menu.findItem(R.id.action_mode_toggle) ?: return
+        updateModeToggleIcon(modeToggle)
+        
+        // Observe mode changes to update the toggle icon only
+        // Source updates are handled by the consolidated observer in onViewCreated
+        viewScope.launch {
+            yokai.core.mode.ModeManager.currentMode
+                .drop(1) // Skip initial - already handled above
+                .collectLatest { mode ->
+                    updateModeToggleIcon(modeToggle)
+                }
+        }
+    }
+
+    private fun updateModeToggleIcon(menuItem: MenuItem) {
+        val currentMode = yokai.core.mode.ModeManager.currentMode.value
+        val icon = when (currentMode) {
+            yokai.core.content.ContentType.MANGA -> R.drawable.ic_book_24dp // Manga icon
+            yokai.core.content.ContentType.NOVEL -> R.drawable.ic_library_books_24dp // Novel icon
+        }
+        val title = when (currentMode) {
+            yokai.core.content.ContentType.MANGA -> "Switch to Novel Mode"
+            yokai.core.content.ContentType.NOVEL -> "Switch to Manga Mode"
+        }
+        menuItem.setIcon(icon)
+        menuItem.title = title
     }
 
     /**
@@ -738,8 +885,4 @@ class BrowseController :
 
     @Parcelize
     data class SmartSearchConfig(val origTitle: String, val origMangaId: Long) : Parcelable
-
-    companion object {
-        const val HELP_URL = "https://tachiyomi.org/docs/guides/source-migration"
-    }
 }

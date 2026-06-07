@@ -35,6 +35,11 @@ SELECT *
 FROM mangas
 WHERE url = :url AND source = :source;
 
+findBySource:
+SELECT *
+FROM mangas
+WHERE source = :source;
+
 findById:
 SELECT *
 FROM mangas

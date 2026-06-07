@@ -3,6 +3,13 @@
     xmlns:app="http://schemas.android.com/apk/res-auto">
 
     <item
+        android:id="@+id/action_mode_toggle"
+        android:icon="@drawable/ic_book_24dp"
+        android:title="Switch Mode"
+        android:visible="false"
+        app:showAsAction="always" />
+
+    <item
         android:id="@+id/action_search"
         android:icon="@drawable/ic_search_24dp"
         android:title="@string/search"

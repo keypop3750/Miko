@@ -96,6 +96,9 @@ import eu.kanade.tachiyomi.widget.LinearLayoutManagerAccurateOffset
 import java.util.Locale
 import kotlin.math.max
 import kotlinx.coroutines.launch
+import uy.kohesive.injekt.Injekt
+import uy.kohesive.injekt.api.get
+import kotlinx.coroutines.flow.collectLatest
 import yokai.i18n.MR
 import yokai.util.lang.getString
 import android.R as AR
@@ -704,7 +707,17 @@ class RecentsController(bundle: Bundle? = null) :
 
     override fun onCoverClick(position: Int) {
         val manga = (adapter.getItem(position) as? RecentMangaItem)?.mch?.manga ?: return
-        router.pushController(MangaDetailsController(manga).withFadeTransaction())
+        // Route to correct details controller based on source type
+        val source = Injekt.get<eu.kanade.tachiyomi.source.SourceManager>().getOrStub(manga.source)
+        if (source is eu.kanade.tachiyomi.source.novel.NovelSourceWrapper) {
+            // Novel source - navigate to novel details
+            router.pushController(
+                eu.kanade.tachiyomi.ui.novel.details.NovelDetailsControllerNew(manga.id!!).withFadeTransaction()
+            )
+        } else {
+            // Manga source - navigate to manga details
+            router.pushController(MangaDetailsController(manga).withFadeTransaction())
+        }
     }
 
     override fun onRemoveHistoryClicked(position: Int) {
@@ -894,6 +907,8 @@ class RecentsController(bundle: Bundle? = null) :
     override fun onCreateOptionsMenu(menu: Menu, inflater: MenuInflater) {
         inflater.inflate(R.menu.recents, menu)
 
+        setupModeToggle(menu)
+
         val searchItem = activityBinding?.searchToolbar?.searchItem
         val searchView = activityBinding?.searchToolbar?.searchView
         activityBinding?.searchToolbar?.setQueryHint(view?.context?.getString(MR.strings.search_recents), !isSearching())
@@ -1008,6 +1023,46 @@ class RecentsController(bundle: Bundle? = null) :
                 )
                 displaySheet?.show()
             }
+            R.id.action_mode_toggle -> {
+                // Get the anchor view for the circular reveal animation
+                // Use multiple strategies to find the menu item view
+                val toolbar = activityBinding?.toolbar
+                val anchorView = toolbar?.let { tb ->
+                    // First try direct findViewById on toolbar
+                    tb.findViewById<View>(R.id.action_mode_toggle)
+                        ?: run {
+                            // Fallback: iterate toolbar children to find ActionMenuItemView
+                            val actionMenuView = (0 until tb.childCount)
+                                .map { tb.getChildAt(it) }
+                                .find { it is androidx.appcompat.widget.ActionMenuView }
+                                as? androidx.appcompat.widget.ActionMenuView
+                            actionMenuView?.let { amv ->
+                                (0 until amv.childCount)
+                                    .map { amv.getChildAt(it) }
+                                    .find { child -> child.id == R.id.action_mode_toggle }
+                            }
+                        }
+                }
+                
+                // Get the root view for the animation
+                val rootView = activityBinding?.mainContent ?: view?.parent as? ViewGroup
+                
+                if (rootView != null && activity != null) {
+                    // Provide immediate visual feedback then animate
+                    eu.kanade.tachiyomi.util.view.ThemeTransitionHelper.animateButtonPress(anchorView) {
+                        eu.kanade.tachiyomi.util.view.ThemeTransitionHelper.animateThemeChange(
+                            activity = activity!!,
+                            anchorView = anchorView,
+                            rootView = rootView,
+                            onThemeChange = { yokai.core.mode.ModeManager.toggleMode() },
+                            duration = 250L  // Faster animation
+                        )
+                    }
+                } else {
+                    yokai.core.mode.ModeManager.toggleMode()
+                }
+                return true
+            }
         }
         return super.onOptionsItemSelected(item)
     }
@@ -1028,6 +1083,34 @@ class RecentsController(bundle: Bundle? = null) :
 
     private fun loadNoMore() {
         adapter.onLoadMoreComplete(null)
+    }
+
+    private fun setupModeToggle(menu: Menu) {
+        val modeToggle = menu.findItem(R.id.action_mode_toggle) ?: return
+        updateModeToggleIcon(modeToggle)
+        
+        // Observe mode changes and update UI accordingly
+        viewScope.launch {
+            yokai.core.mode.ModeManager.currentMode.collectLatest { mode ->
+                updateModeToggleIcon(modeToggle)
+                // Refresh recents content for new mode
+                presenter.onCreate()
+            }
+        }
+    }
+
+    private fun updateModeToggleIcon(menuItem: MenuItem) {
+        val currentMode = yokai.core.mode.ModeManager.currentMode.value
+        val icon = when (currentMode) {
+            yokai.core.content.ContentType.MANGA -> R.drawable.ic_book_24dp // Manga icon
+            yokai.core.content.ContentType.NOVEL -> R.drawable.ic_library_books_24dp // Novel icon
+        }
+        val title = when (currentMode) {
+            yokai.core.content.ContentType.MANGA -> "Switch to Novel Mode"
+            yokai.core.content.ContentType.NOVEL -> "Switch to Manga Mode"
+        }
+        menuItem.setIcon(icon)
+        menuItem.title = title
     }
 
     /**

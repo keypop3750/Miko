@@ -98,7 +98,10 @@ class DownloadButton @JvmOverloads constructor(context: Context, attrs: Attribut
                 binding.downloadProgress.isVisible = false
                 binding.downloadProgressIndeterminate.isVisible = true
                 binding.downloadProgress.isIndeterminate = true
-                binding.downloadIcon.drawable.setTint(disabledColor)
+                // Use accentColor (manga-themed) for queue state instead of static green
+                binding.downloadIcon.drawable.setTint(accentColor)
+                // Material Components API: setIndicatorColor() instead of drawable tint
+                binding.downloadProgressIndeterminate.setIndicatorColor(accentColor)
             }
             Download.State.DOWNLOADING -> {
                 binding.downloadBorder.isVisible = true
@@ -108,7 +111,8 @@ class DownloadButton @JvmOverloads constructor(context: Context, attrs: Attribut
                 binding.downloadProgress.isIndeterminate = false
                 binding.downloadProgress.progress = progress
                 binding.downloadBorder.drawable.setTint(progressBGColor)
-                binding.downloadProgress.progressDrawable?.setTint(downloadedColor)
+                // Material Components API: setIndicatorColor() for themed progress
+                binding.downloadProgress.setIndicatorColor(accentColor)
                 binding.downloadIcon.drawable.setTint(disabledColor)
                 if (!isAnimating) {
                     iconAnimation = ObjectAnimator.ofFloat(binding.downloadIcon, "alpha", 1f, 0f).apply {

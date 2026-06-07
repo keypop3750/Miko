@@ -1,0 +1,162 @@
+<?xml version="1.0" encoding="utf-8"?>
+<eu.kanade.tachiyomi.ui.novel.chapter.ChapterFilterLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:orientation="vertical">
+
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+        <com.google.android.material.textview.MaterialTextView
+            android:id="@+id/filter_title"
+            style="?textAppearanceHeadlineSmall"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:paddingStart="16dp"
+            android:layout_gravity="center_vertical"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintBottom_toBottomOf="parent"
+            android:paddingEnd="12dp"
+            android:text="@string/filter" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/set_as_default_filter"
+            style="@style/Theme.Widget.Button.TextButton"
+            android:layout_width="wrap_content"
+            android:layout_height="38sp"
+            android:padding="4dp"
+            android:layout_marginStart="6dp"
+            android:layout_gravity="center_vertical"
+            app:layout_constraintBaseline_toBaselineOf="@id/filter_title"
+            app:layout_constraintStart_toEndOf="@id/filter_title"
+            android:text="@string/set_as_default" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/reset_as_default_filter"
+            style="@style/Theme.Widget.Button.TextButton"
+            android:layout_width="wrap_content"
+            android:layout_height="38sp"
+            android:padding="4dp"
+            android:layout_marginEnd="6dp"
+            app:layout_constraintStart_toEndOf="@id/set_as_default_filter"
+            app:layout_constraintHorizontal_bias="1.0"
+            android:layout_gravity="center_vertical"
+            app:layout_constraintBaseline_toBaselineOf="@id/filter_title"
+            app:layout_constraintEnd_toEndOf="parent"
+            android:text="@string/reset" />
+    </androidx.constraintlayout.widget.ConstraintLayout>
+
+    <!-- Filter Presets Chip Group -->
+    <com.google.android.material.textview.MaterialTextView
+        android:id="@+id/presets_label"
+        style="?textAppearanceBodySmall"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:layout_marginStart="16dp"
+        android:layout_marginEnd="16dp"
+        android:text="@string/quick_filters"
+        android:textColor="?android:attr/textColorSecondary" />
+
+    <com.google.android.material.chip.ChipGroup
+        android:id="@+id/filter_preset_chips"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="12dp"
+        android:layout_marginEnd="12dp"
+        android:layout_marginBottom="8dp"
+        app:singleSelection="true"
+        app:selectionRequired="false">
+
+        <com.google.android.material.chip.Chip
+            android:id="@+id/preset_all"
+            style="@style/Widget.Material3.Chip.Filter"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/show_all" />
+
+        <com.google.android.material.chip.Chip
+            android:id="@+id/preset_unread"
+            style="@style/Widget.Material3.Chip.Filter"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/show_unread_chapters" />
+
+        <com.google.android.material.chip.Chip
+            android:id="@+id/preset_downloaded"
+            style="@style/Widget.Material3.Chip.Filter"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/only_downloaded" />
+
+        <com.google.android.material.chip.Chip
+            android:id="@+id/preset_bookmarked"
+            style="@style/Widget.Material3.Chip.Filter"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/bookmarked" />
+
+        <com.google.android.material.chip.Chip
+            android:id="@+id/preset_clear"
+            style="@style/Widget.Material3.Chip.Filter.Elevated"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/clear_filters"
+            app:chipIconTint="?attr/colorError"
+            android:textColor="?attr/colorError" />
+    </com.google.android.material.chip.ChipGroup>
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:layout_marginStart="16dp"
+        android:layout_marginEnd="16dp"
+        android:layout_marginBottom="8dp"
+        android:background="?android:attr/listDivider" />
+
+    <com.google.android.material.textview.MaterialTextView
+        android:id="@+id/advanced_filters_label"
+        style="?textAppearanceBodySmall"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="16dp"
+        android:layout_marginEnd="16dp"
+        android:layout_marginBottom="4dp"
+        android:text="@string/advanced_filters"
+        android:textColor="?android:attr/textColorSecondary" />
+
+    <eu.kanade.tachiyomi.widget.TriStateCheckBox
+        android:id="@+id/show_all"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="12dp"
+        android:layout_marginEnd="12dp"
+        android:text="@string/show_all" />
+
+    <eu.kanade.tachiyomi.widget.TriStateCheckBox
+        android:id="@+id/show_unread"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="12dp"
+        android:layout_marginEnd="12dp"
+        android:text="@string/show_unread_chapters" />
+
+    <eu.kanade.tachiyomi.widget.TriStateCheckBox
+        android:id="@+id/show_download"
+        android:text="@string/show_downloaded_chapters"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="12dp"
+        android:layout_marginEnd="12dp" />
+
+    <eu.kanade.tachiyomi.widget.TriStateCheckBox
+        android:id="@+id/show_bookmark"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="12dp"
+        android:layout_marginEnd="12dp"
+        android:text="@string/show_bookmarked_chapters" />
+</eu.kanade.tachiyomi.ui.novel.chapter.ChapterFilterLayout>

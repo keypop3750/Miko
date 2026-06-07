@@ -225,6 +225,22 @@
         <item name="tabIndicatorFullWidth">true</item>
     </style>
 
+    <style name="Theme.Widget.Tabs.ModeSwitch" parent="Widget.Material3.TabLayout">
+        <item name="android:background">@drawable/tab_background_rounded</item>
+        <item name="tabGravity">fill</item>
+        <item name="tabMode">fixed</item>
+        <item name="tabIndicator">@drawable/tab_indicator_rounded</item>
+        <item name="tabIndicatorColor">?attr/colorSecondary</item>
+        <item name="tabIndicatorGravity">stretch</item>
+        <item name="tabIndicatorFullWidth">true</item>
+        <item name="tabSelectedTextColor">?attr/colorOnSecondary</item>
+        <item name="tabTextColor">?attr/colorSecondary</item>
+        <item name="tabRippleColor">@android:color/transparent</item>
+        <item name="tabTextAppearance">@style/TextAppearance.Widget.Tab</item>
+        <item name="tabMaxWidth">0dp</item>
+        <item name="tabMinWidth">0dp</item>
+    </style>
+
     <style name="Widget.Tachiyomi.Slider" parent="Widget.Material3.Slider">
         <item name="trackColorInactive">@color/slider_inactive_track_color</item>
         <item name="trackColorActive">@color/slider_active_track_color</item>

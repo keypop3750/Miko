@@ -1,0 +1,116 @@
+package eu.kanade.tachiyomi.ui.novel.reader
+
+import android.view.LayoutInflater
+import android.view.View
+import android.view.ViewGroup
+import android.widget.FrameLayout
+import android.widget.ImageView
+import android.widget.TextView
+import androidx.recyclerview.widget.DiffUtil
+import androidx.recyclerview.widget.ListAdapter
+import androidx.recyclerview.widget.RecyclerView
+import eu.kanade.tachiyomi.R
+import yokai.domain.novel.NovelChapter
+
+/**
+ * Adapter for displaying chapter list in novel reader bottom sheet.
+ * Similar to manga reader's chapter adapter but simplified for novels.
+ */
+class NovelChapterAdapter(
+    private val onChapterClicked: (NovelChapter) -> Unit
+) : ListAdapter<NovelChapter, NovelChapterAdapter.ViewHolder>(ChapterDiffCallback()) {
+
+    private var currentChapterId: Long? = null
+
+    fun setCurrentChapter(chapterId: Long?) {
+        val oldPosition = currentList.indexOfFirst { it.id == currentChapterId }
+        val newPosition = currentList.indexOfFirst { it.id == chapterId }
+        
+        currentChapterId = chapterId
+        
+        if (oldPosition != -1) notifyItemChanged(oldPosition)
+        if (newPosition != -1) notifyItemChanged(newPosition)
+    }
+
+    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
+        val view = LayoutInflater.from(parent.context)
+            .inflate(R.layout.reader_chapter_item, parent, false)
+        return ViewHolder(view)
+    }
+
+    override fun onBindViewHolder(holder: ViewHolder, position: Int) {
+        holder.bind(getItem(position))
+    }
+
+    inner class ViewHolder(view: View) : RecyclerView.ViewHolder(view) {
+        private val chapterTitle: TextView = view.findViewById(R.id.chapter_title)
+        private val chapterSubtitle: TextView = view.findViewById(R.id.chapter_subtitle)
+        private val bookmarkButton: FrameLayout = view.findViewById(R.id.bookmark_button)
+
+        fun bind(chapter: NovelChapter) {
+            chapterTitle.text = cleanChapterTitle(chapter.title)
+            
+            // Build subtitle with read/unread status and word count
+            val subtitle = buildString {
+                if (chapter.read) {
+                    append("Read")
+                } else {
+                    append("Unread")
+                }
+                
+                // Add word count if available
+                chapter.wordCount?.let {
+                    append(" • ${it} words")
+                }
+                
+                // Add reading position if available
+                if (chapter.lastReadPosition > 0) {
+                    append(" • ${chapter.lastReadPosition} chars")
+                }
+            }
+            chapterSubtitle.text = subtitle
+            
+            // Highlight current chapter
+            val isCurrentChapter = chapter.id == currentChapterId
+            itemView.alpha = if (isCurrentChapter) 1.0f else if (chapter.read) 0.5f else 0.8f
+            
+            // Hide bookmark button for novel reader (not needed)
+            bookmarkButton.visibility = android.view.View.GONE
+            
+            // Click to navigate to chapter
+            itemView.setOnClickListener {
+                onChapterClicked(chapter)
+            }
+        }
+    }
+
+    companion object {
+        /**
+         * Clean chapter titles by removing HTML syntax artifacts that may leak from
+         * extension parsers (e.g. </option>, <select>, &nbsp;).
+         * Preserves legitimate chapter prefixes like C.1, E1, S1, Chapter, etc.
+         */
+        fun cleanChapterTitle(title: String): String {
+            if (title.isBlank()) return title
+
+            // Remove HTML tags including variants with backslash escapes like <\/option>
+            val noTags = title.replace(Regex("""<[^>]+>"""), "")
+
+            // Remove common HTML entities
+            val noEntities = noTags.replace(Regex("""&[a-zA-Z#][a-zA-Z0-9]*;"""), "")
+
+            // Collapse multiple whitespace into single space and trim
+            return noEntities.replace(Regex("""\s+"""), " ").trim()
+        }
+    }
+
+    private class ChapterDiffCallback : DiffUtil.ItemCallback<NovelChapter>() {
+        override fun areItemsTheSame(oldItem: NovelChapter, newItem: NovelChapter): Boolean {
+            return oldItem.id == newItem.id
+        }
+
+        override fun areContentsTheSame(oldItem: NovelChapter, newItem: NovelChapter): Boolean {
+            return oldItem == newItem
+        }
+    }
+}

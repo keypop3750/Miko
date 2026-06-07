@@ -13,7 +13,15 @@
         android:layout_height="match_parent"
         android:orientation="vertical"
         android:id="@+id/catalogue_view"
+        app:layout_behavior="@string/appbar_scrolling_view_behavior"
         tools:context="eu.kanade.tachiyomi.ui.source.browse.BrowseSourceController">
+
+        <!-- Skeleton grid placeholders (shown immediately on animations enabled) -->
+        <yokai.presentation.skeleton.SkeletonGridLayout
+            android:id="@+id/skeleton_grid"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:visibility="gone" />
 
         <com.google.android.material.progressindicator.CircularProgressIndicator
             android:id="@+id/progress"

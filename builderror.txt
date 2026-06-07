@@ -1,0 +1,308 @@
+﻿Type-safe project accessors is an incubating feature.
+> Task :buildSrc:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :buildSrc:generateExternalPluginSpecBuilders UP-TO-DATE
+> Task :buildSrc:extractPrecompiledScriptPluginPlugins UP-TO-DATE
+> Task :buildSrc:compilePluginsBlocks UP-TO-DATE
+> Task :buildSrc:generatePrecompiledScriptPluginAccessors UP-TO-DATE
+> Task :buildSrc:generateScriptPluginAdapters UP-TO-DATE
+> Task :buildSrc:compileKotlin UP-TO-DATE
+> Task :buildSrc:compileJava NO-SOURCE
+> Task :buildSrc:compileGroovy NO-SOURCE
+> Task :buildSrc:pluginDescriptors UP-TO-DATE
+> Task :buildSrc:processResources UP-TO-DATE
+> Task :buildSrc:classes UP-TO-DATE
+> Task :buildSrc:jar UP-TO-DATE
+
+> Configure project :i18n
+w: The following Kotlin/Native targets cannot be built on this machine and are disabled:
+iosArm64, iosSimulatorArm64, iosX64
+To hide this message, add 'kotlin.native.ignoreDisabledTargets=true' to the Gradle properties.
+
+
+
+> Task :app:copyHebrewStrings NO-SOURCE
+> Task :app:preBuild UP-TO-DATE
+> Task :app:preStandardDebugBuild UP-TO-DATE
+> Task :app:mergeStandardDebugNativeDebugMetadata NO-SOURCE
+> Task :app:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :app:dataBindingMergeDependencyArtifactsStandardDebug UP-TO-DATE
+> Task :app:generateStandardDebugResValues UP-TO-DATE
+> Task :app:generateStandardDebugResources UP-TO-DATE
+> Task :app:injectCrashlyticsMappingFileIdStandardDebug UP-TO-DATE
+> Task :app:collectDependenciesStandardDebug UP-TO-DATE
+> Task :app:prepareLibraryDefinitionsStandardDebug UP-TO-DATE
+> Task :app:processStandardDebugGoogleServices UP-TO-DATE
+> Task :data:preBuild UP-TO-DATE
+> Task :data:preDebugBuild UP-TO-DATE
+> Task :data:generateDebugResValues UP-TO-DATE
+> Task :data:generateDebugResources UP-TO-DATE
+> Task :data:packageDebugResources UP-TO-DATE
+> Task :domain:preBuild UP-TO-DATE
+> Task :domain:preDebugBuild UP-TO-DATE
+> Task :domain:generateDebugResValues UP-TO-DATE
+> Task :domain:generateDebugResources UP-TO-DATE
+> Task :domain:packageDebugResources UP-TO-DATE
+> Task :i18n:generateLocalesConfig UP-TO-DATE
+> Task :i18n:generateMRcommonMain UP-TO-DATE
+> Task :i18n:generateMRandroidDebug SKIPPED
+> Task :i18n:generateMRandroidInstrumentedTest UP-TO-DATE
+> Task :i18n:generateMRandroidInstrumentedTestDebug SKIPPED
+> Task :i18n:generateMRandroidMain UP-TO-DATE
+> Task :i18n:generateMRandroidRelease SKIPPED
+> Task :i18n:generateMRcommonTest UP-TO-DATE
+> Task :i18n:generateMRandroidUnitTest UP-TO-DATE
+> Task :i18n:generateMRandroidUnitTestDebug SKIPPED
+> Task :i18n:generateMRandroidUnitTestRelease SKIPPED
+> Task :i18n:preBuild UP-TO-DATE
+> Task :i18n:preDebugBuild UP-TO-DATE
+> Task :i18n:generateDebugResValues UP-TO-DATE
+> Task :i18n:generateDebugResources UP-TO-DATE
+> Task :i18n:packageDebugResources UP-TO-DATE
+> Task :core:archive:preBuild UP-TO-DATE
+> Task :core:archive:preDebugBuild UP-TO-DATE
+> Task :core:archive:generateDebugResValues UP-TO-DATE
+> Task :core:archive:generateDebugResources UP-TO-DATE
+> Task :core:archive:packageDebugResources UP-TO-DATE
+> Task :core:main:preBuild UP-TO-DATE
+> Task :core:main:preDebugBuild UP-TO-DATE
+> Task :core:main:generateDebugResValues UP-TO-DATE
+> Task :core:main:generateDebugResources UP-TO-DATE
+> Task :core:main:packageDebugResources UP-TO-DATE
+> Task :presentation:core:preBuild UP-TO-DATE
+> Task :presentation:core:preDebugBuild UP-TO-DATE
+> Task :presentation:core:generateDebugResValues UP-TO-DATE
+> Task :presentation:core:generateDebugResources UP-TO-DATE
+> Task :presentation:core:packageDebugResources UP-TO-DATE
+> Task :source:api:preBuild UP-TO-DATE
+> Task :source:api:preDebugBuild UP-TO-DATE
+> Task :source:api:generateDebugResValues UP-TO-DATE
+> Task :source:api:generateDebugResources UP-TO-DATE
+> Task :source:api:packageDebugResources UP-TO-DATE
+> Task :source:novel:preBuild UP-TO-DATE
+> Task :source:novel:preDebugBuild UP-TO-DATE
+> Task :source:novel:generateDebugResValues UP-TO-DATE
+> Task :source:novel:generateDebugResources UP-TO-DATE
+> Task :source:novel:packageDebugResources UP-TO-DATE
+> Task :app:mergeStandardDebugResources UP-TO-DATE
+> Task :app:dataBindingGenBaseClassesStandardDebug UP-TO-DATE
+> Task :app:generateStandardDebugBuildConfig
+> Task :data:writeDebugAarMetadata UP-TO-DATE
+> Task :domain:writeDebugAarMetadata UP-TO-DATE
+> Task :i18n:writeDebugAarMetadata UP-TO-DATE
+> Task :core:archive:writeDebugAarMetadata UP-TO-DATE
+> Task :core:main:writeDebugAarMetadata UP-TO-DATE
+> Task :presentation:core:writeDebugAarMetadata UP-TO-DATE
+> Task :source:api:writeDebugAarMetadata UP-TO-DATE
+> Task :source:novel:writeDebugAarMetadata UP-TO-DATE
+> Task :app:checkStandardDebugAarMetadata UP-TO-DATE
+> Task :app:mapStandardDebugSourceSetPaths UP-TO-DATE
+> Task :app:createStandardDebugCompatibleScreenManifests UP-TO-DATE
+> Task :app:extractDeepLinksStandardDebug UP-TO-DATE
+> Task :data:extractDeepLinksDebug UP-TO-DATE
+> Task :data:processDebugManifest UP-TO-DATE
+> Task :domain:extractDeepLinksDebug UP-TO-DATE
+> Task :domain:processDebugManifest UP-TO-DATE
+> Task :i18n:extractDeepLinksDebug UP-TO-DATE
+> Task :i18n:processDebugManifest UP-TO-DATE
+> Task :core:archive:extractDeepLinksDebug UP-TO-DATE
+> Task :core:archive:processDebugManifest UP-TO-DATE
+> Task :core:main:extractDeepLinksDebug UP-TO-DATE
+> Task :core:main:processDebugManifest UP-TO-DATE
+> Task :presentation:core:extractDeepLinksDebug UP-TO-DATE
+> Task :presentation:core:processDebugManifest UP-TO-DATE
+> Task :source:api:extractDeepLinksDebug UP-TO-DATE
+> Task :source:api:processDebugManifest UP-TO-DATE
+> Task :source:novel:extractDeepLinksDebug UP-TO-DATE
+> Task :source:novel:processDebugManifest UP-TO-DATE
+> Task :app:processStandardDebugMainManifest UP-TO-DATE
+> Task :app:processStandardDebugManifest UP-TO-DATE
+> Task :app:processStandardDebugManifestForPackage UP-TO-DATE
+> Task :data:compileDebugLibraryResources UP-TO-DATE
+> Task :data:parseDebugLocalResources UP-TO-DATE
+> Task :domain:parseDebugLocalResources UP-TO-DATE
+> Task :i18n:parseDebugLocalResources UP-TO-DATE
+> Task :i18n:generateDebugRFile UP-TO-DATE
+> Task :core:main:parseDebugLocalResources UP-TO-DATE
+> Task :core:main:generateDebugRFile UP-TO-DATE
+> Task :source:api:parseDebugLocalResources UP-TO-DATE
+> Task :source:api:generateDebugRFile UP-TO-DATE
+> Task :domain:generateDebugRFile UP-TO-DATE
+> Task :data:generateDebugRFile UP-TO-DATE
+> Task :domain:compileDebugLibraryResources UP-TO-DATE
+> Task :i18n:compileDebugLibraryResources UP-TO-DATE
+> Task :core:archive:compileDebugLibraryResources UP-TO-DATE
+> Task :core:archive:parseDebugLocalResources UP-TO-DATE
+> Task :core:archive:generateDebugRFile UP-TO-DATE
+> Task :core:main:compileDebugLibraryResources UP-TO-DATE
+> Task :presentation:core:compileDebugLibraryResources UP-TO-DATE
+> Task :presentation:core:parseDebugLocalResources UP-TO-DATE
+> Task :presentation:core:generateDebugRFile UP-TO-DATE
+> Task :source:api:compileDebugLibraryResources UP-TO-DATE
+> Task :source:novel:compileDebugLibraryResources UP-TO-DATE
+> Task :source:novel:parseDebugLocalResources UP-TO-DATE
+> Task :source:novel:generateDebugRFile UP-TO-DATE
+> Task :app:processStandardDebugResources UP-TO-DATE
+> Task :data:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :data:generateCommonMainDatabaseInterface UP-TO-DATE
+> Task :domain:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :i18n:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :i18n:compileDebugKotlinAndroid UP-TO-DATE
+> Task :i18n:javaPreCompileDebug UP-TO-DATE
+> Task :i18n:compileDebugJavaWithJavac NO-SOURCE
+> Task :i18n:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :core:main:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :core:main:compileDebugKotlinAndroid UP-TO-DATE
+> Task :core:main:javaPreCompileDebug UP-TO-DATE
+> Task :core:main:compileDebugJavaWithJavac NO-SOURCE
+> Task :core:main:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :source:api:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :source:api:compileDebugKotlinAndroid UP-TO-DATE
+> Task :source:api:javaPreCompileDebug UP-TO-DATE
+> Task :source:api:compileDebugJavaWithJavac NO-SOURCE
+> Task :source:api:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :domain:compileDebugKotlinAndroid UP-TO-DATE
+> Task :domain:javaPreCompileDebug UP-TO-DATE
+> Task :domain:compileDebugJavaWithJavac NO-SOURCE
+> Task :domain:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :data:compileDebugKotlinAndroid UP-TO-DATE
+> Task :data:javaPreCompileDebug UP-TO-DATE
+> Task :data:compileDebugJavaWithJavac NO-SOURCE
+> Task :data:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :core:archive:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :core:archive:compileDebugKotlin UP-TO-DATE
+> Task :core:archive:javaPreCompileDebug UP-TO-DATE
+> Task :core:archive:compileDebugJavaWithJavac NO-SOURCE
+> Task :core:archive:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :presentation:core:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :presentation:core:compileDebugKotlin UP-TO-DATE
+> Task :presentation:core:javaPreCompileDebug UP-TO-DATE
+> Task :presentation:core:compileDebugJavaWithJavac NO-SOURCE
+> Task :presentation:core:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :source:novel:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :source:novel:compileDebugKotlinAndroid UP-TO-DATE
+> Task :source:novel:javaPreCompileDebug UP-TO-DATE
+> Task :source:novel:compileDebugJavaWithJavac NO-SOURCE
+> Task :source:novel:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :app:javaPreCompileStandardDebug UP-TO-DATE
+> Task :app:generateStandardDebugAssets UP-TO-DATE
+> Task :data:mergeDebugShaders UP-TO-DATE
+> Task :data:compileDebugShaders NO-SOURCE
+> Task :data:debugAssetsCopyForAGP NO-SOURCE
+> Task :data:generateDebugAssets UP-TO-DATE
+> Task :data:packageDebugAssets UP-TO-DATE
+> Task :domain:mergeDebugShaders UP-TO-DATE
+> Task :domain:compileDebugShaders NO-SOURCE
+> Task :domain:debugAssetsCopyForAGP NO-SOURCE
+> Task :domain:generateDebugAssets UP-TO-DATE
+> Task :domain:packageDebugAssets UP-TO-DATE
+> Task :i18n:mergeDebugShaders UP-TO-DATE
+> Task :i18n:compileDebugShaders NO-SOURCE
+> Task :i18n:debugAssetsCopyForAGP NO-SOURCE
+> Task :i18n:generateDebugAssets UP-TO-DATE
+> Task :i18n:packageDebugAssets UP-TO-DATE
+> Task :core:archive:mergeDebugShaders UP-TO-DATE
+> Task :core:archive:compileDebugShaders NO-SOURCE
+> Task :core:archive:generateDebugAssets UP-TO-DATE
+> Task :core:archive:packageDebugAssets UP-TO-DATE
+> Task :core:main:mergeDebugShaders UP-TO-DATE
+> Task :core:main:compileDebugShaders NO-SOURCE
+> Task :core:main:debugAssetsCopyForAGP NO-SOURCE
+> Task :core:main:generateDebugAssets UP-TO-DATE
+> Task :core:main:packageDebugAssets UP-TO-DATE
+> Task :presentation:core:mergeDebugShaders UP-TO-DATE
+> Task :presentation:core:compileDebugShaders NO-SOURCE
+> Task :presentation:core:generateDebugAssets UP-TO-DATE
+> Task :presentation:core:packageDebugAssets UP-TO-DATE
+> Task :source:api:mergeDebugShaders UP-TO-DATE
+> Task :source:api:compileDebugShaders NO-SOURCE
+> Task :source:api:debugAssetsCopyForAGP NO-SOURCE
+> Task :source:api:generateDebugAssets UP-TO-DATE
+> Task :source:api:packageDebugAssets UP-TO-DATE
+> Task :source:novel:mergeDebugShaders UP-TO-DATE
+> Task :source:novel:compileDebugShaders NO-SOURCE
+> Task :source:novel:debugAssetsCopyForAGP NO-SOURCE
+> Task :source:novel:generateDebugAssets UP-TO-DATE
+> Task :source:novel:packageDebugAssets UP-TO-DATE
+> Task :app:mergeStandardDebugAssets UP-TO-DATE
+> Task :app:compressStandardDebugAssets UP-TO-DATE
+> Task :app:l8DexDesugarLibStandardDebug UP-TO-DATE
+> Task :app:checkStandardDebugDuplicateClasses UP-TO-DATE
+> Task :app:desugarStandardDebugFileDependencies UP-TO-DATE
+> Task :app:mergeExtDexStandardDebug UP-TO-DATE
+> Task :core:archive:bundleLibRuntimeToJarDebug UP-TO-DATE
+> Task :source:novel:bundleLibRuntimeToJarDebug UP-TO-DATE
+> Task :data:bundleLibRuntimeToJarDebug UP-TO-DATE
+> Task :domain:bundleLibRuntimeToJarDebug UP-TO-DATE
+> Task :i18n:bundleLibRuntimeToJarDebug UP-TO-DATE
+> Task :core:main:bundleLibRuntimeToJarDebug UP-TO-DATE
+> Task :source:api:bundleLibRuntimeToJarDebug UP-TO-DATE
+> Task :presentation:core:bundleLibRuntimeToJarDebug UP-TO-DATE
+> Task :data:processDebugJavaRes UP-TO-DATE
+> Task :app:mergeLibDexStandardDebug UP-TO-DATE
+> Task :domain:processDebugJavaRes UP-TO-DATE
+> Task :i18n:processDebugJavaRes UP-TO-DATE
+> Task :core:archive:processDebugJavaRes UP-TO-DATE
+> Task :core:main:processDebugJavaRes UP-TO-DATE
+> Task :presentation:core:processDebugJavaRes UP-TO-DATE
+> Task :source:api:processDebugJavaRes UP-TO-DATE
+> Task :source:novel:processDebugJavaRes UP-TO-DATE
+> Task :app:mergeStandardDebugJniLibFolders UP-TO-DATE
+> Task :data:mergeDebugJniLibFolders UP-TO-DATE
+> Task :data:mergeDebugNativeLibs NO-SOURCE
+> Task :data:copyDebugJniLibsProjectOnly UP-TO-DATE
+> Task :domain:mergeDebugJniLibFolders UP-TO-DATE
+> Task :domain:mergeDebugNativeLibs NO-SOURCE
+> Task :domain:copyDebugJniLibsProjectOnly UP-TO-DATE
+> Task :i18n:mergeDebugJniLibFolders UP-TO-DATE
+> Task :i18n:mergeDebugNativeLibs NO-SOURCE
+> Task :i18n:copyDebugJniLibsProjectOnly UP-TO-DATE
+> Task :core:archive:mergeDebugJniLibFolders UP-TO-DATE
+> Task :core:archive:mergeDebugNativeLibs NO-SOURCE
+> Task :core:archive:copyDebugJniLibsProjectOnly UP-TO-DATE
+> Task :core:main:mergeDebugJniLibFolders UP-TO-DATE
+> Task :core:main:mergeDebugNativeLibs NO-SOURCE
+> Task :core:main:copyDebugJniLibsProjectOnly UP-TO-DATE
+> Task :presentation:core:mergeDebugJniLibFolders UP-TO-DATE
+> Task :presentation:core:mergeDebugNativeLibs NO-SOURCE
+> Task :presentation:core:copyDebugJniLibsProjectOnly UP-TO-DATE
+> Task :source:api:mergeDebugJniLibFolders UP-TO-DATE
+> Task :source:api:mergeDebugNativeLibs NO-SOURCE
+> Task :source:api:copyDebugJniLibsProjectOnly UP-TO-DATE
+> Task :source:novel:mergeDebugJniLibFolders UP-TO-DATE
+> Task :source:novel:mergeDebugNativeLibs NO-SOURCE
+> Task :source:novel:copyDebugJniLibsProjectOnly UP-TO-DATE
+> Task :app:mergeStandardDebugNativeLibs UP-TO-DATE
+> Task :app:stripStandardDebugDebugSymbols UP-TO-DATE
+> Task :app:validateSigningStandardDebug UP-TO-DATE
+> Task :app:writeStandardDebugAppMetadata UP-TO-DATE
+> Task :app:writeStandardDebugSigningConfigVersions UP-TO-DATE
+
+> Task :app:compileStandardDebugKotlin FAILED
+./gradlew : e: file:///C:/Users/karol/OneDrive/Documents/GitHub/Miko/app/src/main/java/yokai/p
+resentation/library/displayoptions/BadgesTab.kt:60:47 Unresolved reference 'language_badges'.
+At line:1 char:1
++ ./gradlew assembleStandardDebug 2>&1 | Out-File -FilePath builderror. ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (e: file:///C:/U...nguage_badges'.:String) [], Re 
+   moteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+e: file:///C:/Users/karol/OneDrive/Documents/GitHub/Miko/app/src/main/java/yokai/presentation/
+library/displayoptions/BadgesTab.kt:69:47 Unresolved reference 'download_badges'.
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':app:compileStandardDebugKotlin'.
+> A failure occurred while executing org.jetbrains.kotlin.compilerRunner.GradleCompilerRunnerW
+ithWorkers$GradleKotlinCompilerWorkAction
+   > Compilation error. See log for more details
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights.
+> Get more help at https://help.gradle.org.
+
+BUILD FAILED in 21s
+192 actionable tasks: 2 executed, 190 up-to-date

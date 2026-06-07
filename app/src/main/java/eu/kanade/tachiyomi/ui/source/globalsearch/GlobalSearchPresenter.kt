@@ -10,6 +10,7 @@ import eu.kanade.tachiyomi.extension.ExtensionManager
 import eu.kanade.tachiyomi.source.CatalogueSource
 import eu.kanade.tachiyomi.source.Source
 import eu.kanade.tachiyomi.source.SourceManager
+import eu.kanade.tachiyomi.source.isNovelSource
 import eu.kanade.tachiyomi.source.model.MangasPage
 import eu.kanade.tachiyomi.source.model.SManga
 import eu.kanade.tachiyomi.ui.base.presenter.BaseCoroutinePresenter
@@ -28,6 +29,7 @@ import kotlinx.coroutines.sync.withPermit
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
 import uy.kohesive.injekt.injectLazy
+import yokai.core.mode.ModeManager
 import yokai.domain.manga.interactor.GetManga
 import yokai.domain.manga.interactor.InsertManga
 import yokai.domain.manga.interactor.UpdateManga
@@ -52,9 +54,10 @@ open class GlobalSearchPresenter(
     private val updateManga: UpdateManga by injectLazy()
 
     /**
-     * Enabled sources.
+     * Enabled sources - refreshed when mode changes.
      */
-    val sources by lazy { getSourcesToQuery() }
+    var sources: List<CatalogueSource> = emptyList()
+        private set
 
     private var fetchSourcesJob: Job? = null
 
@@ -78,6 +81,9 @@ open class GlobalSearchPresenter(
         super.onCreate()
 
         extensionFilter = initialExtensionFilter
+        
+        // Initialize sources based on current mode
+        refreshSources()
 
         if (items.isEmpty()) {
             // Perform a search with previous or initial state
@@ -90,6 +96,7 @@ open class GlobalSearchPresenter(
 
     /**
      * Returns a list of enabled sources ordered by language and name.
+     * Filters sources based on current content mode (manga vs novel).
      *
      * @return list containing enabled sources.
      */
@@ -97,10 +104,13 @@ open class GlobalSearchPresenter(
         val languages = preferences.enabledLanguages().get()
         val hiddenCatalogues = preferences.hiddenSources().get()
         val pinnedCatalogues = preferences.pinnedCatalogues().get()
+        val isNovelMode = ModeManager.isNovelMode()
 
         val list = sourceManager.getCatalogueSources()
             .filter { it.lang in languages }
             .filterNot { it.id.toString() in hiddenCatalogues }
+            // Filter by content mode: novel sources for novel mode, manga sources for manga mode
+            .filter { source -> source.isNovelSource() == isNovelMode }
             .sortedBy { "(${it.lang}) ${it.name}" }
 
         return if (preferences.onlySearchPinned().get()) {
@@ -130,6 +140,33 @@ open class GlobalSearchPresenter(
         }
 
         return filterSources
+    }
+
+    /**
+     * Refreshes the sources list based on current mode.
+     * Call this when the content mode changes.
+     */
+    fun refreshSources() {
+        sources = getSourcesToQuery()
+    }
+
+    /**
+     * Refreshes sources and re-runs the current search with the new mode's sources.
+     * Called when user toggles between manga and novel mode during global search.
+     */
+    fun researchWithNewMode() {
+        // Clear current results
+        items = emptyList()
+        loadTime.clear()
+        fetchSourcesJob?.cancel()
+        
+        // Refresh sources for new mode
+        refreshSources()
+        
+        // Force re-search with same query
+        val currentQuery = query
+        query = "" // Reset to force search
+        search(currentQuery)
     }
 
     /**

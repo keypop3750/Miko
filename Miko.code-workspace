@@ -1,0 +1,23 @@
+{
+	"folders": [
+		{
+			"path": "."
+		},
+		{
+			"path": "../aniyomi-fork"
+		},
+		{
+			"path": "../annas-archive-extension"
+		},
+		{
+			"path": "../mangayomi"
+		},
+		{
+			"path": "../Miko-master"
+		},
+		{
+			"path": "../MikoNovelSources"
+		}
+	],
+	"settings": {}
+}

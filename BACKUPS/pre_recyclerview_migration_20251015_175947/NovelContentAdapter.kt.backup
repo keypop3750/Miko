@@ -1,0 +1,353 @@
+package eu.kanade.tachiyomi.ui.novel.reader
+
+import android.view.LayoutInflater
+import android.view.View
+import android.view.ViewGroup
+import android.widget.TextView
+import androidx.recyclerview.widget.DiffUtil
+import androidx.recyclerview.widget.RecyclerView
+import eu.kanade.tachiyomi.R
+import eu.kanade.tachiyomi.databinding.NovelParagraphItemBinding
+
+/**
+ * RecyclerView adapter for novel content display with paragraph-level items.
+ * 
+ * Architecture Pattern: Based on WebtoonAdapter's approach with:
+ * - DiffUtil for efficient updates
+ * - Multiple view types (Paragraph, ChapterHeader, Loading, Error)
+ * - Sealed class items for type safety
+ * 
+ * This adapter enables natural paragraph spacing through RecyclerView item margins
+ * (8dp padding in novel_paragraph_item.xml) rather than HTML manipulation.
+ */
+class NovelContentAdapter(
+    private val activity: NovelReaderActivity
+) : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
+    
+    private var items: List<NovelContentItem> = emptyList()
+    
+    // Current text settings - updated by Activity instead of reading SharedPreferences
+    data class TextSettings(
+        val textSize: Int = 16,
+        val lineHeight: Float = 1.5f,
+        val paragraphSpacing: Int = 16,
+        val textAlignment: Int = 0  // 0=left, 1=center, 2=justify
+    )
+    
+    private var currentSettings = TextSettings()
+    
+    /**
+     * Public getter for current items (used by position tracking in Phase 4).
+     * Allows Activity to calculate character positions from RecyclerView scroll state.
+     */
+    fun getItems(): List<NovelContentItem> = items
+    
+    /**
+     * Get current text settings (for logging/debugging).
+     */
+    fun getCurrentSettings(): TextSettings = currentSettings
+    
+    /**
+     * Update text settings and refresh visible views.
+     * Called by Activity when user changes settings.
+     * 
+     * CRITICAL: This method calls notifyDataSetChanged() to trigger rebinding of ALL ViewHolders.
+     * This eliminates the need for adapter swapping in the Activity.
+     */
+    @android.annotation.SuppressLint("NotifyDataSetChanged")
+    fun updateTextSettings(settings: TextSettings) {
+        android.util.Log.e("NovelContentAdapter", "════════════════════════════════════════")
+        android.util.Log.e("NovelContentAdapter", "updateTextSettings() called on adapter")
+        android.util.Log.e("NovelContentAdapter", "Thread: ${Thread.currentThread().name}")
+        android.util.Log.e("NovelContentAdapter", "OLD settings: size=${currentSettings.textSize}, spacing=${currentSettings.paragraphSpacing}, alignment=${currentSettings.textAlignment}")
+        android.util.Log.e("NovelContentAdapter", "NEW settings: size=${settings.textSize}, spacing=${settings.paragraphSpacing}, alignment=${settings.textAlignment}")
+        
+        val settingsChanged = (currentSettings.textSize != settings.textSize ||
+                              currentSettings.paragraphSpacing != settings.paragraphSpacing ||
+                              currentSettings.lineHeight != settings.lineHeight ||
+                              currentSettings.textAlignment != settings.textAlignment)
+        
+        android.util.Log.e("NovelContentAdapter", "Settings actually changed? $settingsChanged")
+        
+        currentSettings = settings
+        
+        android.util.Log.e("NovelContentAdapter", "currentSettings UPDATED: size=${currentSettings.textSize}, spacing=${currentSettings.paragraphSpacing}, alignment=${currentSettings.textAlignment}")
+        android.util.Log.e("NovelContentAdapter", "Current item count: ${items.size}")
+        android.util.Log.e("NovelContentAdapter", "About to call notifyDataSetChanged()...")
+        
+        // FIX: Trigger rebinding of ALL ViewHolders with new settings
+        // This approach matches QuickNovel's pattern and eliminates need for adapter swapping
+        val beforeTime = System.currentTimeMillis()
+        notifyDataSetChanged()
+        val afterTime = System.currentTimeMillis()
+        
+        android.util.Log.e("NovelContentAdapter", "✅ notifyDataSetChanged() COMPLETED in ${afterTime - beforeTime}ms")
+        android.util.Log.e("NovelContentAdapter", "ViewHolders should now rebind with new settings")
+        android.util.Log.e("NovelContentAdapter", "════════════════════════════════════════")
+    }
+    
+    /**
+     * Updates adapter items using DiffUtil for efficient RecyclerView updates.
+     * Mirrors WebtoonAdapter.setChapters() approach.
+     * 
+     * DiffUtil intelligently calculates the minimal set of changes needed,
+     * avoiding full list refreshes and maintaining smooth scrolling.
+     */
+    fun setContent(newItems: List<NovelContentItem>) {
+        val oldItems = items
+        items = newItems
+        
+        val diffResult = DiffUtil.calculateDiff(object : DiffUtil.Callback() {
+            override fun getOldListSize() = oldItems.size
+            override fun getNewListSize() = newItems.size
+            
+            override fun areItemsTheSame(oldPos: Int, newPos: Int): Boolean {
+                val oldItem = oldItems[oldPos]
+                val newItem = newItems[newPos]
+                
+                // Check if items represent the same content based on their unique IDs
+                return when {
+                    oldItem is NovelContentItem.Paragraph && newItem is NovelContentItem.Paragraph ->
+                        oldItem.id == newItem.id
+                    oldItem is NovelContentItem.ChapterHeader && newItem is NovelContentItem.ChapterHeader ->
+                        oldItem.chapterId == newItem.chapterId
+                    oldItem is NovelContentItem.Loading && newItem is NovelContentItem.Loading ->
+                        oldItem.chapterId == newItem.chapterId
+                    oldItem is NovelContentItem.Error && newItem is NovelContentItem.Error ->
+                        oldItem.chapterId == newItem.chapterId
+                    else -> false
+                }
+            }
+            
+            override fun areContentsTheSame(oldPos: Int, newPos: Int): Boolean {
+                // For data class items, equals() checks all properties
+                return oldItems[oldPos] == newItems[newPos]
+            }
+        })
+        
+        diffResult.dispatchUpdatesTo(this)
+        
+        android.util.Log.d("NovelContentAdapter", "Content updated: ${items.size} items")
+    }
+    
+    override fun getItemCount() = items.size
+    
+    override fun getItemViewType(position: Int): Int {
+        return when (items[position]) {
+            is NovelContentItem.Paragraph -> VIEW_TYPE_PARAGRAPH
+            is NovelContentItem.ChapterHeader -> VIEW_TYPE_CHAPTER_HEADER
+            is NovelContentItem.Loading -> VIEW_TYPE_LOADING
+            is NovelContentItem.Error -> VIEW_TYPE_ERROR
+        }
+    }
+    
+    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RecyclerView.ViewHolder {
+        val inflater = LayoutInflater.from(parent.context)
+        
+        return when (viewType) {
+            VIEW_TYPE_PARAGRAPH -> {
+                val binding = NovelParagraphItemBinding.inflate(inflater, parent, false)
+                ParagraphViewHolder(binding)
+            }
+            VIEW_TYPE_CHAPTER_HEADER -> {
+                // Use simple text for chapter headers (can be enhanced later)
+                val view = inflater.inflate(android.R.layout.simple_list_item_1, parent, false)
+                ChapterHeaderViewHolder(view)
+            }
+            VIEW_TYPE_LOADING -> {
+                val view = inflater.inflate(android.R.layout.simple_list_item_1, parent, false)
+                LoadingViewHolder(view)
+            }
+            VIEW_TYPE_ERROR -> {
+                val view = inflater.inflate(android.R.layout.simple_list_item_2, parent, false)
+                ErrorViewHolder(view)
+            }
+            else -> error("Unknown view type: $viewType")
+        }
+    }
+    
+    override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {
+        android.util.Log.e("NovelContentAdapter", "onBindViewHolder() called for position $position (${items[position]::class.simpleName})")
+        
+        when (val item = items[position]) {
+            is NovelContentItem.Paragraph -> (holder as ParagraphViewHolder).bind(item)
+            is NovelContentItem.ChapterHeader -> (holder as ChapterHeaderViewHolder).bind(item)
+            is NovelContentItem.Loading -> (holder as LoadingViewHolder).bind(item)
+            is NovelContentItem.Error -> (holder as ErrorViewHolder).bind(item)
+        }
+        
+        android.util.Log.e("NovelContentAdapter", "onBindViewHolder() finished for position $position")
+    }
+    
+    // ViewHolders
+    
+    /**
+     * ViewHolder for paragraph items - the primary content display.
+     * Applies theme colors dynamically from activity.
+     */
+    inner class ParagraphViewHolder(
+        private val binding: NovelParagraphItemBinding
+    ) : RecyclerView.ViewHolder(binding.root) {
+        
+        /**
+         * Public accessor for TextView to enable line-level character tracking.
+         * Used by Activity's extractVisibleLines() to get precise text layout information.
+         */
+        fun getParagraphTextView(): TextView = binding.paragraphText
+        
+        fun bind(paragraph: NovelContentItem.Paragraph) {
+            // AGGRESSIVE LOGGING: Track bind() calls
+            if (adapterPosition <= 2) { // Log first 3 paragraphs
+                android.util.Log.e("NovelContentAdapter", "════════════════════════════════════════")
+                android.util.Log.e("NovelContentAdapter", "bind() called for paragraph $adapterPosition")
+                android.util.Log.e("NovelContentAdapter", "Current settings at bind time:")
+                android.util.Log.e("NovelContentAdapter", "  Text size: ${currentSettings.textSize}")
+                android.util.Log.e("NovelContentAdapter", "  Line height: ${currentSettings.lineHeight}")
+                android.util.Log.e("NovelContentAdapter", "  Paragraph spacing: ${currentSettings.paragraphSpacing}")
+                android.util.Log.e("NovelContentAdapter", "  Text alignment: ${currentSettings.textAlignment}")
+            }
+            
+            // Set paragraph text (already styled via Markwon)
+            binding.paragraphText.text = paragraph.text
+            
+            // Apply theme colors from activity
+            val textColor = activity.getCurrentTextColor()
+            val backgroundColor = activity.getCurrentBackgroundColor()
+            binding.paragraphText.setTextColor(textColor)
+            binding.root.setBackgroundColor(backgroundColor)
+            
+            // Phase 5: Apply text settings from adapter's current settings
+            binding.paragraphText.textSize = currentSettings.textSize.toFloat()
+            binding.paragraphText.setLineSpacing(0f, currentSettings.lineHeight)
+            
+            // Apply paragraph spacing via layout params
+            val layoutParams = binding.root.layoutParams as? androidx.recyclerview.widget.RecyclerView.LayoutParams
+            val spacingPx = (currentSettings.paragraphSpacing * activity.resources.displayMetrics.density).toInt()
+            layoutParams?.topMargin = spacingPx / 2
+            layoutParams?.bottomMargin = spacingPx / 2
+            binding.root.layoutParams = layoutParams
+            
+            // Debug logging for paragraph spacing
+            if (adapterPosition <= 2) { // Log first 3 paragraphs
+                android.util.Log.e("NovelContentAdapter", "APPLIED to paragraph $adapterPosition:")
+                android.util.Log.e("NovelContentAdapter", "  Text size: ${binding.paragraphText.textSize}")
+                android.util.Log.e("NovelContentAdapter", "  Spacing: ${currentSettings.paragraphSpacing}dp = ${spacingPx}px (margin: ${spacingPx/2}px top/bottom)")
+                android.util.Log.e("NovelContentAdapter", "  Top margin: ${layoutParams?.topMargin}px")
+                android.util.Log.e("NovelContentAdapter", "  Bottom margin: ${layoutParams?.bottomMargin}px")
+                android.util.Log.e("NovelContentAdapter", "════════════════════════════════════════")
+            }
+            
+            // Native Android text justification (API 26+)
+            // 0 = Left align (START gravity, no justification)
+            // 1 = Center (CENTER_HORIZONTAL gravity, no justification)
+            // 2 = Right align (END gravity, no justification)
+            // 3 = Justify (START gravity + INTER_WORD justification)
+            when (currentSettings.textAlignment) {
+                0 -> {
+                    // Left align
+                    binding.paragraphText.gravity = android.view.Gravity.START
+                    binding.paragraphText.justificationMode = android.text.Layout.JUSTIFICATION_MODE_NONE
+                }
+                1 -> {
+                    // Center
+                    binding.paragraphText.gravity = android.view.Gravity.CENTER_HORIZONTAL
+                    binding.paragraphText.justificationMode = android.text.Layout.JUSTIFICATION_MODE_NONE
+                }
+                2 -> {
+                    // Right align
+                    binding.paragraphText.gravity = android.view.Gravity.END
+                    binding.paragraphText.justificationMode = android.text.Layout.JUSTIFICATION_MODE_NONE
+                }
+                3 -> {
+                    // Justify - uses START gravity with inter-word spacing adjustment
+                    binding.paragraphText.gravity = android.view.Gravity.START
+                    binding.paragraphText.justificationMode = android.text.Layout.JUSTIFICATION_MODE_INTER_WORD
+                }
+                else -> {
+                    // Default to left align
+                    binding.paragraphText.gravity = android.view.Gravity.START
+                    binding.paragraphText.justificationMode = android.text.Layout.JUSTIFICATION_MODE_NONE
+                }
+            }
+            
+            // Optional: Click listener for future features (highlighting, copy, TTS)
+            binding.root.setOnClickListener {
+                activity.onParagraphClicked(paragraph)
+            }
+        }
+    }
+    
+    /**
+     * ViewHolder for chapter header items.
+     * Displays chapter title at the beginning of content.
+     */
+    inner class ChapterHeaderViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
+        private val titleText: TextView = itemView.findViewById(android.R.id.text1)
+        
+        fun bind(header: NovelContentItem.ChapterHeader) {
+            titleText.text = header.chapterTitle
+            titleText.textSize = 20f
+            titleText.setPadding(16, 24, 16, 24)
+            
+            // Apply theme colors
+            val textColor = activity.getCurrentTextColor()
+            val backgroundColor = activity.getCurrentBackgroundColor()
+            titleText.setTextColor(textColor)
+            itemView.setBackgroundColor(backgroundColor)
+        }
+    }
+    
+    /**
+     * ViewHolder for loading state items.
+     * Displayed while fetching chapter content from provider.
+     */
+    inner class LoadingViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
+        private val text: TextView = itemView.findViewById(android.R.id.text1)
+        
+        fun bind(loading: NovelContentItem.Loading) {
+            text.text = loading.loadingMessage
+            text.setPadding(16, 16, 16, 16)
+            
+            // Apply theme colors
+            val textColor = activity.getCurrentTextColor()
+            val backgroundColor = activity.getCurrentBackgroundColor()
+            text.setTextColor(textColor)
+            itemView.setBackgroundColor(backgroundColor)
+        }
+    }
+    
+    /**
+     * ViewHolder for error state items.
+     * Displayed when chapter loading fails.
+     */
+    inner class ErrorViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
+        private val text1: TextView = itemView.findViewById(android.R.id.text1)
+        private val text2: TextView = itemView.findViewById(android.R.id.text2)
+        
+        fun bind(error: NovelContentItem.Error) {
+            text1.text = "Error Loading Chapter"
+            text2.text = error.errorMessage
+            
+            // Apply theme colors
+            val textColor = activity.getCurrentTextColor()
+            val backgroundColor = activity.getCurrentBackgroundColor()
+            text1.setTextColor(textColor)
+            text2.setTextColor(textColor)
+            itemView.setBackgroundColor(backgroundColor)
+            
+            // Retry on click if supported
+            if (error.canRetry) {
+                itemView.setOnClickListener {
+                    // Future: Implement retry logic
+                }
+            }
+        }
+    }
+    
+    companion object {
+        private const val VIEW_TYPE_PARAGRAPH = 0
+        private const val VIEW_TYPE_CHAPTER_HEADER = 1
+        private const val VIEW_TYPE_LOADING = 2
+        private const val VIEW_TYPE_ERROR = 3
+    }
+}

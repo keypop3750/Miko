@@ -2,6 +2,7 @@ package yokai.domain.recents.interactor
 
 import eu.kanade.tachiyomi.data.database.models.MangaChapter
 import eu.kanade.tachiyomi.data.database.models.MangaChapterHistory
+import yokai.core.content.ContentType
 import yokai.domain.chapter.ChapterRepository
 import yokai.domain.history.HistoryRepository
 import yokai.util.limitAndOffset
@@ -15,10 +16,12 @@ class GetRecents(
         isResuming: Boolean,
         search: String = "",
         offset: Long = 0L,
+        contentType: ContentType = ContentType.MANGA,
     ): List<MangaChapter> {
         val (limit, actualOffset) = limitAndOffset(true, isResuming, offset)
+        val contentTypeValue = contentType.value.toLong()
 
-        return chapterRepository.getRecents(filterScanlators, search, limit, actualOffset)
+        return chapterRepository.getRecents(filterScanlators, search, limit, actualOffset, contentTypeValue)
     }
 
     suspend fun awaitUngrouped(
@@ -26,10 +29,12 @@ class GetRecents(
         isResuming: Boolean,
         search: String = "",
         offset: Long = 0L,
+        contentType: ContentType = ContentType.MANGA,
     ): List<MangaChapterHistory> {
         val (limit, actualOffset) = limitAndOffset(true, isResuming, offset)
+        val contentTypeValue = contentType.value.toLong()
 
-        return historyRepository.getRecentsUngrouped(filterScanlators, search, limit, actualOffset)
+        return historyRepository.getRecentsUngrouped(filterScanlators, search, limit, actualOffset, contentTypeValue)
     }
 
     suspend fun awaitBySeries(
@@ -37,10 +42,12 @@ class GetRecents(
         isResuming: Boolean,
         search: String = "",
         offset: Long = 0L,
+        contentType: ContentType = ContentType.MANGA,
     ): List<MangaChapterHistory> {
         val (limit, actualOffset) = limitAndOffset(true, isResuming, offset)
+        val contentTypeValue = contentType.value.toLong()
 
-        return historyRepository.getRecentsBySeries(filterScanlators, search, limit, actualOffset)
+        return historyRepository.getRecentsBySeries(filterScanlators, search, limit, actualOffset, contentTypeValue)
     }
 
     suspend fun awaitAll(
@@ -50,18 +57,24 @@ class GetRecents(
         isResuming: Boolean,
         search: String = "",
         offset: Long = 0L,
+        contentType: ContentType = ContentType.MANGA,
     ): List<MangaChapterHistory> {
         val (limit, actualOffset) = limitAndOffset(isEndless, isResuming, offset)
+        val contentTypeValue = contentType.value.toLong()
 
-        return historyRepository.getRecentsAll(includeRead, filterScanlators, search, limit, actualOffset)
+        return historyRepository.getRecentsAll(includeRead, filterScanlators, search, limit, actualOffset, contentTypeValue)
     }
 
-    suspend fun awaitUpdates(limit: Long = 0L): List<MangaChapterHistory> =
-        historyRepository.getRecentsAll(
+    suspend fun awaitUpdates(limit: Long = 0L, contentType: ContentType = ContentType.MANGA): List<MangaChapterHistory> {
+        val contentTypeValue = contentType.value.toLong()
+        
+        return historyRepository.getRecentsAll(
             includeRead = false,
             filterScanlators = true,
             search = "",
             limit = limit,
-            offset = 0L
+            offset = 0L,
+            contentType = contentTypeValue
         )
+    }
 }

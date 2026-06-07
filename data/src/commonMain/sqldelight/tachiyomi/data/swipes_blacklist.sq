@@ -1,0 +1,61 @@
+-- Swipes feature blacklist table
+-- Stores manga URLs that user has swiped left (rejected/blacklisted)
+-- These manga will be permanently excluded from future swipe recommendations
+
+CREATE TABLE swipes_blacklist(
+    blacklist_id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    manga_url TEXT NOT NULL,
+    source_id INTEGER NOT NULL,
+    manga_title TEXT,
+    cover_url TEXT,
+    blacklisted_at INTEGER NOT NULL,
+    UNIQUE(manga_url, source_id) ON CONFLICT REPLACE
+);
+
+CREATE INDEX swipes_blacklist_source_id_index ON swipes_blacklist(source_id);
+CREATE INDEX swipes_blacklist_blacklisted_at_index ON swipes_blacklist(blacklisted_at);
+
+-- Insert a new blacklisted manga
+insert:
+INSERT INTO swipes_blacklist(manga_url, source_id, manga_title, cover_url, blacklisted_at)
+VALUES(:mangaUrl, :sourceId, :mangaTitle, :coverUrl, :blacklistedAt);
+
+-- Get all blacklisted URLs (for filtering recommendations)
+getAllBlacklistedUrls:
+SELECT manga_url, source_id 
+FROM swipes_blacklist;
+
+-- Get all blacklisted manga with details (for history/management UI)
+getAllBlacklisted:
+SELECT *
+FROM swipes_blacklist
+ORDER BY blacklisted_at DESC;
+
+-- Check if manga is blacklisted
+isBlacklisted:
+SELECT EXISTS(
+    SELECT 1 FROM swipes_blacklist 
+    WHERE manga_url = :mangaUrl 
+    AND source_id = :sourceId
+);
+
+-- Remove from blacklist (un-blacklist)
+removeFromBlacklist:
+DELETE FROM swipes_blacklist
+WHERE manga_url = :mangaUrl
+AND source_id = :sourceId;
+
+-- Clear all blacklisted manga
+clearAllBlacklist:
+DELETE FROM swipes_blacklist;
+
+-- Get blacklist count
+getBlacklistCount:
+SELECT COUNT(*) FROM swipes_blacklist;
+
+-- Get recently blacklisted (last 50)
+getRecentlyBlacklisted:
+SELECT *
+FROM swipes_blacklist
+ORDER BY blacklisted_at DESC
+LIMIT 50;

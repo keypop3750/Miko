@@ -48,8 +48,8 @@ class ChapterRepositoryImpl(private val handler: DatabaseHandler) : ChapterRepos
             chaptersQueries.findUnreadByMangaId(mangaId, filterScanlators.toInt().toLong(), Chapter::mapper)
         }
 
-    override suspend fun getRecents(filterScanlators: Boolean, search: String, limit: Long, offset: Long): List<MangaChapter> =
-        handler.awaitList { chaptersQueries.getRecents(search, filterScanlators.toInt().toLong(), limit, offset, MangaChapter::mapper) }
+    override suspend fun getRecents(filterScanlators: Boolean, search: String, limit: Long, offset: Long, contentType: Long): List<MangaChapter> =
+        handler.awaitList { chaptersQueries.getRecents(search, filterScanlators.toInt().toLong(), contentType, limit, offset, MangaChapter::mapper) }
 
     override suspend fun getScanlatorsByChapter(mangaId: Long): List<String> =
         handler.awaitList { chaptersQueries.getScanlatorsByMangaId(mangaId) { it.orEmpty() } }
@@ -145,8 +145,8 @@ class ChapterRepositoryImpl(private val handler: DatabaseHandler) : ChapterRepos
         }
     }
 
-    override suspend fun insertBulk(chapters: List<Chapter>) =
-        handler.await(true) {
+    override suspend fun insertBulk(chapters: List<Chapter>): List<Chapter> {
+        return handler.await(true) {
             chapters.map { chapter ->
                 chaptersQueries.insert(
                     mangaId = chapter.manga_id!!,
@@ -166,4 +166,5 @@ class ChapterRepositoryImpl(private val handler: DatabaseHandler) : ChapterRepos
                 chapter.copy().apply { id = lastInsertId }
             }
         }
+    }
 }

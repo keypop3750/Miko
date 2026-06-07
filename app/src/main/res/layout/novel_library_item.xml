@@ -1,0 +1,147 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout 
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="?attr/selectableItemBackground"
+    android:padding="12dp">
+
+    <!-- Novel Cover -->
+    <androidx.cardview.widget.CardView
+        android:id="@+id/cover_card"
+        android:layout_width="64dp"
+        android:layout_height="88dp"
+        app:cardCornerRadius="6dp"
+        app:cardElevation="2dp"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent">
+
+        <ImageView
+            android:id="@+id/novel_cover"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:scaleType="centerCrop"
+            tools:src="@drawable/default_novel_cover" />
+
+    </androidx.cardview.widget.CardView>
+
+    <!-- Novel Title -->
+    <TextView
+        android:id="@+id/novel_title"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="12dp"
+        android:layout_marginEnd="8dp"
+        android:textAppearance="@style/TextAppearance.Material3.BodyLarge"
+        android:textStyle="bold"
+        android:maxLines="2"
+        android:ellipsize="end"
+        app:layout_constraintEnd_toStartOf="@id/favorite_indicator"
+        app:layout_constraintStart_toEndOf="@id/cover_card"
+        app:layout_constraintTop_toTopOf="@id/cover_card"
+        tools:text="Example Novel Title That Could Be Long" />
+
+    <!-- Novel Author -->
+    <TextView
+        android:id="@+id/novel_author"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="2dp"
+        android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
+        android:textColor="?attr/colorOnSurfaceVariant"
+        android:maxLines="1"
+        android:ellipsize="end"
+        app:layout_constraintEnd_toEndOf="@id/novel_title"
+        app:layout_constraintStart_toStartOf="@id/novel_title"
+        app:layout_constraintTop_toBottomOf="@id/novel_title"
+        tools:text="Author Name" />
+
+    <!-- Novel Info (Chapters + Status) -->
+    <TextView
+        android:id="@+id/novel_info"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:textAppearance="@style/TextAppearance.Material3.BodySmall"
+        android:textColor="?attr/colorOnSurfaceVariant"
+        android:maxLines="1"
+        android:ellipsize="end"
+        app:layout_constraintEnd_toEndOf="@id/novel_title"
+        app:layout_constraintStart_toStartOf="@id/novel_title"
+        app:layout_constraintTop_toBottomOf="@id/novel_author"
+        tools:text="245 chapters • Ongoing" />
+
+    <!-- Reading Progress -->
+    <ProgressBar
+        android:id="@+id/novel_progress"
+        style="?android:attr/progressBarStyleHorizontal"
+        android:layout_width="0dp"
+        android:layout_height="4dp"
+        android:layout_marginTop="6dp"
+        android:layout_marginEnd="8dp"
+        android:max="100"
+        android:visibility="gone"
+        app:layout_constraintEnd_toStartOf="@id/novel_progress_text"
+        app:layout_constraintStart_toStartOf="@id/novel_title"
+        app:layout_constraintTop_toBottomOf="@id/novel_info"
+        tools:progress="65"
+        tools:visibility="visible" />
+
+    <TextView
+        android:id="@+id/novel_progress_text"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textAppearance="@style/TextAppearance.Material3.LabelSmall"
+        android:textColor="?attr/colorOnSurfaceVariant"
+        android:visibility="gone"
+        app:layout_constraintEnd_toEndOf="@id/novel_title"
+        app:layout_constraintTop_toTopOf="@id/novel_progress"
+        app:layout_constraintBottom_toBottomOf="@id/novel_progress"
+        tools:text="65%"
+        tools:visibility="visible" />
+
+    <!-- Last Update -->
+    <TextView
+        android:id="@+id/last_update"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:textAppearance="@style/TextAppearance.Material3.LabelSmall"
+        android:textColor="?attr/colorOnSurfaceVariant"
+        android:maxLines="1"
+        android:ellipsize="end"
+        app:layout_constraintEnd_toEndOf="@id/novel_title"
+        app:layout_constraintStart_toStartOf="@id/novel_title"
+        app:layout_constraintTop_toBottomOf="@id/novel_progress"
+        app:layout_constraintBottom_toBottomOf="@id/cover_card"
+        tools:text="Updated 2d ago" />
+
+    <!-- Status Indicators -->
+    <ImageView
+        android:id="@+id/favorite_indicator"
+        android:layout_width="20dp"
+        android:layout_height="20dp"
+        android:src="@drawable/ic_heart_24dp"
+        android:tint="?attr/colorPrimary"
+        android:visibility="gone"
+        android:contentDescription="Favorite"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toTopOf="@id/novel_title"
+        tools:visibility="visible" />
+
+    <ImageView
+        android:id="@+id/unread_indicator"
+        android:layout_width="8dp"
+        android:layout_height="8dp"
+        android:layout_marginTop="4dp"
+        android:layout_marginEnd="4dp"
+        android:background="@drawable/unread_indicator_background"
+        android:visibility="gone"
+        android:contentDescription="Has unread chapters"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/favorite_indicator"
+        tools:visibility="visible" />
+
+</androidx.constraintlayout.widget.ConstraintLayout>

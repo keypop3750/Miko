@@ -121,11 +121,11 @@
         android:id="@+id/category_hopper_frame"
         android:layout_width="wrap_content"
         tools:layout_marginBottom="62dp"
-        tools:layout_gravity="bottom|end"
+        tools:layout_gravity="bottom|center_horizontal"
         android:layout_height="wrap_content"
         android:clipToPadding="false"
         android:clipChildren="false"
-        android:layout_gravity="top|center">
+        android:layout_gravity="bottom|center_horizontal">
 
         <include layout="@layout/rounded_category_hopper"
             android:id="@+id/rounded_category_hopper" />

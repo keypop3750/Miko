@@ -1,0 +1,68 @@
+-- Swipes feature history table
+-- Tracks last 50 swiped manga (both left and right swipes)
+-- Used for displaying swipe history and analytics
+
+CREATE TABLE swipes_history(
+    history_id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    manga_url TEXT NOT NULL,
+    source_id INTEGER NOT NULL,
+    manga_title TEXT NOT NULL,
+    manga_author TEXT,
+    cover_url TEXT,
+    swipe_direction TEXT NOT NULL, -- 'left' or 'right'
+    swiped_at INTEGER NOT NULL,
+    UNIQUE(manga_url, source_id) ON CONFLICT REPLACE
+);
+
+CREATE INDEX swipes_history_swiped_at_index ON swipes_history(swiped_at);
+CREATE INDEX swipes_history_source_id_index ON swipes_history(source_id);
+
+-- Insert a new swipe entry
+insert:
+INSERT INTO swipes_history(manga_url, source_id, manga_title, manga_author, cover_url, swipe_direction, swiped_at)
+VALUES(:mangaUrl, :sourceId, :mangaTitle, :mangaAuthor, :coverUrl, :swipeDirection, :swipedAt);
+
+-- Get last 50 swipes
+getLast50Swipes:
+SELECT *
+FROM swipes_history
+ORDER BY swiped_at DESC
+LIMIT 50;
+
+-- Get all swipes (for analytics)
+getAllSwipes:
+SELECT *
+FROM swipes_history
+ORDER BY swiped_at DESC;
+
+-- Get swipes by direction
+getSwipesByDirection:
+SELECT *
+FROM swipes_history
+WHERE swipe_direction = :direction
+ORDER BY swiped_at DESC
+LIMIT 50;
+
+-- Delete old swipes (keep only last 50)
+deleteOldSwipes:
+DELETE FROM swipes_history
+WHERE history_id NOT IN (
+    SELECT history_id
+    FROM swipes_history
+    ORDER BY swiped_at DESC
+    LIMIT 50
+);
+
+-- Clear all history
+clearAll:
+DELETE FROM swipes_history;
+
+-- Get swipe counts by direction
+getSwipeCount:
+SELECT swipe_direction, COUNT(*) AS swipe_count
+FROM swipes_history
+GROUP BY swipe_direction;
+
+-- Get total swipe count
+getTotalSwipeCount:
+SELECT COUNT(*) FROM swipes_history;

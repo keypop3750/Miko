@@ -24,9 +24,26 @@
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toTopOf="parent"
             app:layout_constraintBottom_toTopOf="@id/subtitle"
-            app:layout_constraintEnd_toStartOf="@id/title_more_icon"
+            app:layout_constraintEnd_toStartOf="@id/inline_no_results"
             app:layout_constraintVertical_chainStyle="packed"
-            tools:text="Title" />
+            app:layout_constraintHorizontal_bias="0"
+            tools:text="Source Title" />
+
+        <!-- Inline "No results" text (next to title) -->
+        <TextView
+            android:id="@+id/inline_no_results"
+            style="?textAppearanceBodySmall"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:alpha="0.5"
+            android:visibility="gone"
+            app:layout_constraintStart_toEndOf="@id/title"
+            app:layout_constraintEnd_toStartOf="@id/right_indicator_frame"
+            app:layout_constraintTop_toTopOf="@id/title"
+            app:layout_constraintBottom_toBottomOf="@id/title"
+            android:text="• No results"
+            tools:visibility="visible" />
 
         <TextView
             android:id="@+id/subtitle"
@@ -37,25 +54,48 @@
             android:maxLines="1"
             android:visibility="gone"
             app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintEnd_toStartOf="@+id/title_more_icon"
+            app:layout_constraintEnd_toStartOf="@+id/right_indicator_frame"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toBottomOf="@+id/title"
             tools:text="English"
             tools:visibility="visible" />
 
-        <ImageView
-            android:id="@+id/title_more_icon"
+        <!-- Frame to hold either loading indicator or arrow icon -->
+        <FrameLayout
+            android:id="@+id/right_indicator_frame"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:contentDescription="@string/more"
             android:padding="@dimen/material_component_text_fields_padding_above_and_below_label"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintTop_toTopOf="parent"
-            app:srcCompat="@drawable/ic_arrow_forward_24dp"
-            app:tint="?attr/colorOnBackground" />
+            app:layout_constraintTop_toTopOf="parent">
+
+            <!-- Loading indicator (replaces arrow when loading) -->
+            <com.google.android.material.progressindicator.CircularProgressIndicator
+                android:id="@+id/inline_progress"
+                android:indeterminate="true"
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:layout_gravity="center"
+                android:visibility="gone"
+                app:indicatorSize="24dp"
+                app:trackThickness="2dp"
+                tools:visibility="visible" />
+
+            <!-- Arrow icon (shown when not loading and has results) -->
+            <ImageView
+                android:id="@+id/title_more_icon"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                android:contentDescription="@string/more"
+                app:srcCompat="@drawable/ic_arrow_forward_24dp"
+                app:tint="?attr/colorOnBackground" />
+
+        </FrameLayout>
     </androidx.constraintlayout.widget.ConstraintLayout>
 
+    <!-- Legacy no_results text - kept for binding compatibility but now hidden -->
     <TextView
         android:id="@+id/no_results"
         style="?textAppearanceBodyMedium"
@@ -70,7 +110,7 @@
         app:layout_constraintBottom_toBottomOf="parent"
         android:visibility="gone"
         app:layout_constraintStart_toStartOf="parent"
-        tools:visibility="visible"
+        tools:visibility="gone"
         app:layout_constraintTop_toBottomOf="@id/title_wrapper"
         android:text="@string/no_results_found"/>
 
@@ -90,14 +130,34 @@
         app:layout_constraintTop_toBottomOf="@id/title_wrapper"
         app:layout_constraintVertical_bias="1.0">
 
+        <!-- Legacy centered progress - kept for binding but now hidden -->
         <com.google.android.material.progressindicator.CircularProgressIndicator
             android:id="@+id/progress"
             android:indeterminate="true"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_gravity="center"
+            android:visibility="gone"
             app:indicatorSize="16dp"
             app:trackThickness="3dp" />
+
+        <!-- Skeleton placeholder container (horizontal scroll like recycler) -->
+        <HorizontalScrollView
+            android:id="@+id/skeleton_container"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:scrollbars="none"
+            android:visibility="gone">
+
+            <LinearLayout
+                android:id="@+id/skeleton_row"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:paddingStart="7dp"
+                android:paddingEnd="7dp" />
+
+        </HorizontalScrollView>
 
         <androidx.recyclerview.widget.RecyclerView
             android:id="@+id/recycler"

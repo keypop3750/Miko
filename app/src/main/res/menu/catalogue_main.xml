@@ -16,6 +16,12 @@
         app:showAsAction="ifRoom"/>
 
     <item
+        android:id="@+id/action_mode_toggle"
+        android:title="@string/toggle_content_mode"
+        android:icon="@drawable/ic_book_24dp"
+        app:showAsAction="ifRoom" />
+
+    <item
         android:id="@+id/action_more"
         android:icon="@drawable/ic_more_vert_24dp"
         android:title="@string/more"

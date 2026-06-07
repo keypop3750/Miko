@@ -35,6 +35,7 @@ class ExtensionHolder(view: View, val adapter: ExtensionAdapter) :
 
     private val context = view.context
     private val binding = ExtensionCardItemBinding.bind(view)
+
     init {
         binding.extButton.setOnClickListener {
             adapter.buttonClickListener.onButtonClick(flexibleAdapterPosition)
@@ -182,6 +183,7 @@ class ExtensionHolder(view: View, val adapter: ExtensionAdapter) :
                     setText(MR.strings.update)
                 }
                 else -> {
+                    resetStrokeColor()
                     setText(MR.strings.settings)
                 }
             }

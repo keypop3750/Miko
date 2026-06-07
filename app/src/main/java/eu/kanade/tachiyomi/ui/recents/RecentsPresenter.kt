@@ -39,6 +39,8 @@ import kotlinx.coroutines.withContext
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
 import uy.kohesive.injekt.injectLazy
+import yokai.core.content.ContentType
+import yokai.core.mode.ModeManager
 import yokai.data.DatabaseHandler
 import yokai.domain.chapter.interactor.GetChapter
 import yokai.domain.chapter.interactor.UpdateChapter
@@ -202,6 +204,7 @@ class RecentsPresenter(
                     !updatePageCount && !isOnFirstPage,
                     query,
                     (if (isCustom) ENDLESS_LIMIT else pageOffset).toLong(),
+                    ModeManager.currentMode.value,
                 )
             }
             RecentsViewType.History -> {
@@ -211,6 +214,7 @@ class RecentsPresenter(
                         !updatePageCount && !isOnFirstPage,
                         query,
                         (if (isCustom) ENDLESS_LIMIT else pageOffset).toLong(),
+                        ModeManager.currentMode.value,
                     )
                 } else {
                     getRecents.awaitUngrouped(
@@ -218,6 +222,7 @@ class RecentsPresenter(
                         !updatePageCount && !isOnFirstPage,
                         query,
                         (if (isCustom) ENDLESS_LIMIT else pageOffset).toLong(),
+                        ModeManager.currentMode.value,
                     )
                 }
                 if (groupChaptersHistory.isByTime) {
@@ -273,6 +278,7 @@ class RecentsPresenter(
                     !updatePageCount && !isOnFirstPage,
                     query,
                     (if (isCustom) ENDLESS_LIMIT else pageOffset).toLong(),
+                    ModeManager.currentMode.value,
                 ).groupBy {
                     val date = it.chapter.date_fetch
                     it.manga.id to if (date <= 0L) "-1" else dateFormat.format(Date(date))

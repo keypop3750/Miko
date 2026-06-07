@@ -89,6 +89,21 @@
         <item name="background">@color/md_black_1000</item>
         <item name="readerBackground">@color/md_black_1000</item>
     </style>
+    
+    <!--== Mode-specific Theme Overlays ==-->
+    <!-- These overlays are applied dynamically when switching between manga/novel modes -->
+    <!-- They allow theme changes without activity recreate when base themes match -->
+    
+    <style name="ThemeOverlay.Tachiyomi.MangaMode" parent="">
+        <!-- Manga mode uses the primary accent colors -->
+        <!-- This overlay is essentially empty as manga is the default -->
+    </style>
+    
+    <style name="ThemeOverlay.Tachiyomi.NovelMode" parent="">
+        <!-- Novel mode uses slightly warmer accent for distinction -->
+        <!-- These can be customized to give novel mode a unique feel -->
+        <!-- Currently matching manga for seamless transitions -->
+    </style>
 
     <style name="Theme.Tachiyomi.FlatLime">
         <item name="colorPrimary">@color/primaryLime</item>

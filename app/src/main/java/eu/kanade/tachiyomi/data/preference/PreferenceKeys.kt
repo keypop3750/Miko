@@ -9,6 +9,12 @@ object PreferenceKeys {
     const val lightTheme = "light_theme"
     const val darkTheme = "dark_theme"
     const val themeDarkAmoled = "pref_theme_dark_amoled_key"
+    
+    // Novel mode theme settings
+    const val novelLightTheme = "novel_light_theme"
+    const val novelDarkTheme = "novel_dark_theme"
+    const val novelThemeDarkAmoled = "novel_theme_dark_amoled"
+    const val useSeparateNovelTheme = "use_separate_novel_theme"
 
     const val startingTab = "starting_tab"
 
@@ -17,6 +23,8 @@ object PreferenceKeys {
     const val deniedA11FilePermission = "denied_a11_file_permission"
 
     const val enableTransitions = "pref_enable_transitions_key"
+    
+    const val sourceOpeningAnimation = "source_opening_animation"
 
     const val pagerCutoutBehavior = "pager_cutout_behavior"
 
@@ -96,6 +104,8 @@ object PreferenceKeys {
     const val lastUsedCatalogueSource = "last_catalogue_source"
 
     const val lastUsedCategory = "last_used_category"
+    const val lastUsedMangaCategory = "last_used_manga_category"
+    const val lastUsedNovelCategory = "last_used_novel_category"
 
     const val catalogueAsList = "pref_display_catalogue_as_list"
 
@@ -160,6 +170,9 @@ object PreferenceKeys {
     const val dateFormat = "app_date_format"
 
     const val defaultCategory = "default_category"
+    
+    /** Home library category - category to show on app startup. -1 means last used. */
+    const val homeLibraryCategory = "home_library_category"
 
     const val skipRead = "skip_read"
 
@@ -229,6 +242,8 @@ object PreferenceKeys {
     const val coverRatios = "cover_ratio"
 
     const val coverColors = "cover_colors"
+
+    const val novelCoverColors = "novel_cover_colors"
 
     const val hideChapterTitles = "hide_chapter_titles"
 

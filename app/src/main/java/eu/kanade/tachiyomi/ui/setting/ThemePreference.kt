@@ -57,6 +57,19 @@ class ThemePreference @JvmOverloads constructor(context: Context, attrs: Attribu
     lateinit var binding: ThemesPreferenceBinding
     private val managerLight = LinearLayoutManager(context, LinearLayoutManager.HORIZONTAL, false)
     private val managerDark = LinearLayoutManager(context, LinearLayoutManager.HORIZONTAL, false)
+    
+    /** When true, this theme preference saves to novel theme preferences instead of manga themes */
+    var isNovelTheme: Boolean = false
+        set(value) {
+            field = value
+            // Reinitialize the selection listeners with the new mode
+            selectExtensionLight = fastAdapterLight.getSelectExtension().setThemeListener(false)
+            selectExtensionDark = fastAdapterDark.getSelectExtension().setThemeListener(true)
+            // Refresh the adapters to show correct selection state
+            fastAdapterLight.notifyDataSetChanged()
+            fastAdapterDark.notifyDataSetChanged()
+        }
+    
     init {
         layoutResource = R.layout.themes_preference
         fastAdapterLight = FastAdapter.with(itemAdapterLight)
@@ -86,10 +99,19 @@ class ThemePreference @JvmOverloads constructor(context: Context, attrs: Attribu
         val nightMode = if (isDarkMode) AppCompatDelegate.MODE_NIGHT_YES else AppCompatDelegate.MODE_NIGHT_NO
         selectionListener = object : ISelectionListener<ThemeItem> {
             override fun onSelectionChanged(item: ThemeItem, selected: Boolean) {
-                if (isDarkMode) {
-                    preferences.darkTheme().set(item.theme)
+                // Save to novel or manga theme preferences based on isNovelTheme flag
+                if (isNovelTheme) {
+                    if (isDarkMode) {
+                        preferences.novelDarkTheme().set(item.theme)
+                    } else {
+                        preferences.novelLightTheme().set(item.theme)
+                    }
                 } else {
-                    preferences.lightTheme().set(item.theme)
+                    if (isDarkMode) {
+                        preferences.darkTheme().set(item.theme)
+                    } else {
+                        preferences.lightTheme().set(item.theme)
+                    }
                 }
                 if (!selected) {
                     preferences.nightMode().set(nightMode)
@@ -194,17 +216,34 @@ class ThemePreference @JvmOverloads constructor(context: Context, attrs: Attribu
         @Suppress("UNUSED_PARAMETER")
         override var isSelected: Boolean
             get() {
+                // Get the correct theme preferences based on whether this is a novel theme
                 val darkTheme = try {
-                    preferences.darkTheme().get()
+                    if (this@ThemePreference.isNovelTheme) {
+                        preferences.novelDarkTheme().get()
+                    } else {
+                        preferences.darkTheme().get()
+                    }
                 } catch (_: Exception) {
                     ThemeUtil.convertNewThemes(preferences.context)
-                    preferences.darkTheme().get()
+                    if (this@ThemePreference.isNovelTheme) {
+                        preferences.novelDarkTheme().get()
+                    } else {
+                        preferences.darkTheme().get()
+                    }
                 }
                 val lightTheme = try {
-                    preferences.lightTheme().get()
+                    if (this@ThemePreference.isNovelTheme) {
+                        preferences.novelLightTheme().get()
+                    } else {
+                        preferences.lightTheme().get()
+                    }
                 } catch (_: Exception) {
                     ThemeUtil.convertNewThemes(preferences.context)
-                    preferences.lightTheme().get()
+                    if (this@ThemePreference.isNovelTheme) {
+                        preferences.novelLightTheme().get()
+                    } else {
+                        preferences.lightTheme().get()
+                    }
                 }
                 return when (preferences.nightMode().get()) {
                     AppCompatDelegate.MODE_NIGHT_YES -> darkTheme == theme && isDarkTheme
@@ -267,7 +306,13 @@ class ThemePreference @JvmOverloads constructor(context: Context, attrs: Attribu
                 binding.themeItem3.imageTintList =
                     ColorStateList.valueOf(inactiveTab)
                 binding.themeLayout.setBackgroundColor(background)
-                if (item.isDarkTheme && preferences.themeDarkAmoled().get()) {
+                // Check the correct AMOLED preference based on novel theme mode
+                val isAmoled = if (this@ThemePreference.isNovelTheme) {
+                    preferences.novelThemeDarkAmoled().get()
+                } else {
+                    preferences.themeDarkAmoled().get()
+                }
+                if (item.isDarkTheme && isAmoled) {
                     binding.themeLayout.setBackgroundColor(Color.BLACK)
                 }
             }

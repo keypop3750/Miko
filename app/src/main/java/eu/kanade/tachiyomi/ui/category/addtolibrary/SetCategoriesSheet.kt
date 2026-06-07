@@ -47,6 +47,9 @@ class SetCategoriesSheet(
     private val addingToLibrary: Boolean,
     val onMangaAdded: (() -> Unit) = { },
 ) : E2EBottomSheetDialog<SetCategoriesSheetBinding>(activity) {
+    
+    // Track if action was completed to avoid double-calling callback
+    private var actionCompleted = false
 
     constructor(
         activity: Activity,
@@ -157,6 +160,17 @@ class SetCategoriesSheet(
             checkBox.goToNextStep()
             item.state = checkBox.state
             setCategoriesButtons()
+            
+            // Auto-add when adding to library (swipes feature) - click category = immediate add
+            if (addingToLibrary && checkedItems.isNotEmpty() && !actionCompleted) {
+                actionCompleted = true
+                // Short delay for visual feedback
+                binding.root.postDelayed({
+                    addMangaToCategories()
+                    dismiss()
+                }, 300)
+            }
+            
             true
         }
     }
@@ -263,8 +277,37 @@ class SetCategoriesSheet(
         }
 
         binding.addToCategoriesButton.setOnClickListener {
+            actionCompleted = true
             addMangaToCategories()
             dismiss()
+        }
+        
+        // Handle dismiss - add to default category if user dismisses without selecting
+        setOnDismissListener {
+            // If adding to library and user dismissed without making changes, add to default category
+            if (addingToLibrary && !actionCompleted && listManga.size == 1 && !listManga.first().favorite) {
+                actionCompleted = true
+                val manga = listManga.first()
+                
+                // Set as favorite and update database (same as addMangaToCategories but without categories)
+                manga.favorite = true
+                manga.date_added = Date().time
+
+                // FIXME: Don't do blocking
+                runBlocking {
+                    updateManga.await(
+                        MangaUpdate(
+                            id = manga.id!!,
+                            favorite = manga.favorite,
+                            dateAdded = manga.date_added,
+                        )
+                    )
+                }
+                
+                // Set default category and trigger callback
+                Category.lastCategoriesAddedTo = setOf(0)
+                onMangaAdded()
+            }
         }
     }
 

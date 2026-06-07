@@ -7,11 +7,30 @@
     android:layout_height="match_parent"
     android:background="?attr/background">
 
+    <!-- Toolbar for Activity mode (hidden in Controller mode) -->
+    <com.google.android.material.appbar.AppBarLayout
+        android:id="@+id/manga_app_bar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:visibility="gone"
+        android:background="@android:color/transparent"
+        app:elevation="0dp">
+
+        <com.google.android.material.appbar.MaterialToolbar
+            android:id="@+id/manga_toolbar"
+            android:layout_width="match_parent"
+            android:layout_height="?attr/actionBarSize"
+            android:background="@android:color/transparent"
+            app:navigationIcon="?attr/homeAsUpIndicator"
+            app:title="@null" />
+    </com.google.android.material.appbar.AppBarLayout>
+
     <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
         android:id="@+id/swipe_refresh"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:background="?attr/background">
+        android:background="?attr/background"
+        app:layout_behavior="@string/appbar_scrolling_view_behavior">
 
         <androidx.constraintlayout.widget.ConstraintLayout
             android:id="@+id/linear_recycler_layout"

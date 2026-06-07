@@ -1,0 +1,77 @@
+package eu.kanade.tachiyomi.ui.novel.reader
+
+import android.content.Context
+import yokai.core.mode.ContentModeContext
+import yokai.core.mode.ModeManager
+import yokai.core.content.ContentType
+
+/**
+ * Helper functions for opening the novel reader from various parts of the application.
+ * Provides easy access to novel reading functionality while respecting mode context.
+ */
+object NovelReaderNavigator {
+
+    /**
+     * Open novel reader for a specific novel
+     */
+    fun openNovel(context: Context, novelId: Long, chapterId: Long? = null) {
+        // Ensure we're in novel mode for proper context handling
+        if (ModeManager.currentMode.value != ContentType.NOVEL) {
+            ModeManager.setMode(ContentType.NOVEL)
+        }
+        
+        val modeContext = ContentModeContext.currentContext
+        modeContext.openReader(context, novelId, chapterId)
+    }
+
+    /**
+     * Open novel reader for a specific chapter
+     */
+    fun openChapter(context: Context, chapterId: Long) {
+        // Ensure we're in novel mode for proper context handling
+        if (ModeManager.currentMode.value != ContentType.NOVEL) {
+            ModeManager.setMode(ContentType.NOVEL)
+        }
+        
+        val modeContext = ContentModeContext.currentContext
+        modeContext.openChapter(context, chapterId)
+    }
+
+    /**
+     * Continue reading from where the user left off
+     */
+    fun continueReading(context: Context, novelId: Long) {
+        // This will open the novel reader which will automatically 
+        // load the saved reading position
+        openNovel(context, novelId)
+    }
+
+    /**
+     * Open novel reader with specific reading preferences applied
+     */
+    fun openWithPreferences(
+        context: Context, 
+        novelId: Long, 
+        chapterId: Long? = null,
+        preferences: yokai.core.novel.reader.NovelReaderPreferences? = null
+    ) {
+        // TODO: Apply preferences before opening reader
+        // For now, just open normally
+        openNovel(context, novelId, chapterId)
+    }
+}
+
+/**
+ * Extension functions for easy access from controllers and activities
+ */
+fun Context.openNovelReader(novelId: Long, chapterId: Long? = null) {
+    NovelReaderNavigator.openNovel(this, novelId, chapterId)
+}
+
+fun Context.openNovelChapter(chapterId: Long) {
+    NovelReaderNavigator.openChapter(this, chapterId)
+}
+
+fun Context.continueReadingNovel(novelId: Long) {
+    NovelReaderNavigator.continueReading(this, novelId)
+}

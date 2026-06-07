@@ -14,7 +14,11 @@ abstract class Pager(var currentPage: Int = 1) {
     var hasNextPage = true
         private set
 
-    protected val results = MutableSharedFlow<Pair<Int, List<SManga>>>()
+    // CRITICAL: replay=1 prevents data loss when cache returns results before flow collection starts.
+    // On 3rd+ source open, memory cache serves data so fast that emit() can happen before
+    // collectLatest() is ready, causing infinite loading. Replay ensures the emission is stored
+    // and delivered to late collectors.
+    protected val results = MutableSharedFlow<Pair<Int, List<SManga>>>(replay = 1)
 
     fun asFlow(): SharedFlow<Pair<Int, List<SManga>>> {
         return results.asSharedFlow()

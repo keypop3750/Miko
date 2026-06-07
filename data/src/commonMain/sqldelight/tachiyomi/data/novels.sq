@@ -1,0 +1,80 @@
+import kotlin.Boolean;
+
+-- Novel-specific core table (completely separate from manga)
+CREATE TABLE novels (
+    _id INTEGER PRIMARY KEY,
+    source INTEGER NOT NULL,
+    url TEXT NOT NULL,
+    title TEXT NOT NULL,
+    author TEXT,
+    description TEXT,
+    genre TEXT,
+    status INTEGER NOT NULL DEFAULT 0, -- 0=Unknown, 1=Ongoing, 2=Completed, 3=Hiatus, 4=Cancelled
+    poster_url TEXT,
+    favorite INTEGER AS Boolean NOT NULL DEFAULT 0,
+    last_update INTEGER,
+    initialized INTEGER AS Boolean NOT NULL DEFAULT 0,
+    date_added INTEGER,
+    word_count INTEGER DEFAULT 0,
+    chapter_count INTEGER DEFAULT 0,
+    cover_last_modified INTEGER NOT NULL DEFAULT 0,
+    vibrant_cover_color INTEGER,
+    chapter_flags INTEGER NOT NULL DEFAULT 0,
+    filtered_translators TEXT,
+    UNIQUE(source, url)
+);
+
+-- Indexes for performance
+CREATE INDEX novels_url_index ON novels(url);
+CREATE INDEX novels_favorite_index ON novels(favorite) WHERE favorite = 1;
+CREATE INDEX novels_source_index ON novels(source);
+
+-- Basic novel queries
+findAllNovels:
+SELECT *
+FROM novels;
+
+findNovelByUrlAndSource:
+SELECT *
+FROM novels
+WHERE url = :url AND source = :source;
+
+findNovelById:
+SELECT *
+FROM novels
+WHERE _id = :novelId;
+
+findFavoriteNovels:
+SELECT *
+FROM novels
+WHERE favorite = 1;
+
+insertNovel:
+INSERT INTO novels(source, url, title, author, description, genre, status, poster_url, favorite, last_update, initialized, date_added, word_count, chapter_count, cover_last_modified, vibrant_cover_color, chapter_flags, filtered_translators)
+VALUES (:source, :url, :title, :author, :description, :genre, :status, :poster_url, :favorite, :last_update, :initialized, :date_added, :word_count, :chapter_count, :cover_last_modified, :vibrant_cover_color, :chapter_flags, :filtered_translators);
+
+updateNovel:
+UPDATE novels SET
+    title = coalesce(:title, title),
+    author = coalesce(:author, author),
+    description = coalesce(:description, description),
+    genre = coalesce(:genre, genre),
+    status = coalesce(:status, status),
+    poster_url = coalesce(:poster_url, poster_url),
+    favorite = coalesce(:favorite, favorite),
+    last_update = coalesce(:last_update, last_update),
+    initialized = coalesce(:initialized, initialized),
+    word_count = coalesce(:word_count, word_count),
+    chapter_count = coalesce(:chapter_count, chapter_count),
+    cover_last_modified = coalesce(:cover_last_modified, cover_last_modified),
+    vibrant_cover_color = coalesce(:vibrant_cover_color, vibrant_cover_color),
+    chapter_flags = coalesce(:chapter_flags, chapter_flags),
+    filtered_translators = coalesce(:filtered_translators, filtered_translators)
+WHERE _id = :novelId;
+
+deleteNovel:
+DELETE FROM novels
+WHERE _id = :novelId;
+
+selectLastInsertedRowId:
+SELECT last_insert_rowid();

@@ -1,0 +1,4 @@
+-- Migration 33: Add manga_author column to swipes_history table
+-- This allows storing author information for swiped manga in history
+
+ALTER TABLE swipes_history ADD COLUMN manga_author TEXT;

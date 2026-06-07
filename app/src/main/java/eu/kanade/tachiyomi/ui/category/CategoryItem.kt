@@ -15,11 +15,6 @@ import eu.kanade.tachiyomi.ui.category.CategoryPresenter.Companion.CREATE_CATEGO
 class CategoryItem(val category: Category) : AbstractFlexibleItem<CategoryHolder>() {
 
     /**
-     * Whether this item is currently selected.
-     */
-    var isEditing = false
-
-    /**
      * Returns the layout resource for this item.
      */
     override fun getLayoutRes(): Int {
@@ -46,14 +41,13 @@ class CategoryItem(val category: Category) : AbstractFlexibleItem<CategoryHolder
      */
     override fun bindViewHolder(adapter: FlexibleAdapter<IFlexible<RecyclerView.ViewHolder>>, holder: CategoryHolder, position: Int, payloads: MutableList<Any>) {
         holder.bind(category)
-        holder.isEditing(isEditing)
     }
 
     /**
      * Returns true if this item is draggable.
      */
     override fun isDraggable(): Boolean {
-        return category.order != CREATE_CATEGORY_ORDER && !isEditing
+        return category.order != CREATE_CATEGORY_ORDER
     }
 
     override fun equals(other: Any?): Boolean {

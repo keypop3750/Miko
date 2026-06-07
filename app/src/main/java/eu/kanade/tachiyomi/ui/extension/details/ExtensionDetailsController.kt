@@ -29,6 +29,7 @@ import eu.kanade.tachiyomi.data.preference.PreferencesHelper
 import eu.kanade.tachiyomi.data.preference.SharedPreferencesDataStore
 import eu.kanade.tachiyomi.databinding.ExtensionDetailControllerBinding
 import eu.kanade.tachiyomi.extension.model.Extension
+import eu.kanade.tachiyomi.extension.novel.model.NovelExtension
 import eu.kanade.tachiyomi.network.NetworkHelper
 import eu.kanade.tachiyomi.source.ConfigurableSource
 import eu.kanade.tachiyomi.source.Source
@@ -96,42 +97,76 @@ class ExtensionDetailsController(bundle: Bundle? = null) :
         super.onViewCreated(view)
         scrollViewWith(binding.extensionPrefsRecycler, padBottom = true)
 
-        val extension = presenter.extension ?: return
         val context = view.context
-
         val themedContext by lazy { getPreferenceThemeContext() }
         val manager = PreferenceManager(themedContext)
-        val dataStore = SharedPreferencesDataStore(
-            context.getSharedPreferences(extension.getPreferenceKey(), Context.MODE_PRIVATE),
-        )
-        manager.preferenceDataStore = dataStore
-        manager.onDisplayPreferenceDialogListener = this
-        val screen = manager.createPreferenceScreen(themedContext)
-        preferenceScreen = screen
+        
+        // Handle both manga and novel extensions
+        if (presenter.isNovelExtension) {
+            val novelExtension = presenter.novelExtension ?: return
+            
+            val dataStore = SharedPreferencesDataStore(
+                context.getSharedPreferences(novelExtension.getPreferenceKey(), Context.MODE_PRIVATE),
+            )
+            manager.preferenceDataStore = dataStore
+            manager.onDisplayPreferenceDialogListener = this
+            val screen = manager.createPreferenceScreen(themedContext)
+            preferenceScreen = screen
 
-        val multiSource = extension.sources.size > 1
-        val isMultiLangSingleSource = multiSource && extension.sources.map { it.name }.distinct().size == 1
-        val languages = preferences.enabledLanguages().get()
+            // Novel extensions have sources but they're NovelSource type, not Source
+            // For now, we just show the extension header without source-specific preferences
+            // Novel sources can be added later if they support ConfigurableSource
+            
+            manager.setPreferences(screen)
 
-        for (source in extension.sources.sortedByDescending { it.isLangEnabled(languages) }) {
-            addPreferencesForSource(screen, source, multiSource, isMultiLangSingleSource)
+            binding.extensionPrefsRecycler.layoutManager = LinearLayoutManagerAccurateOffset(context)
+            val concatAdapterConfig = ConcatAdapter.Config.Builder()
+                .setStableIdMode(ConcatAdapter.Config.StableIdMode.ISOLATED_STABLE_IDS)
+                .build()
+            screen.setShouldUseGeneratedIds(true)
+            val extHeaderAdapter = ExtensionDetailsHeaderAdapter(presenter)
+            extHeaderAdapter.setHasStableIds(true)
+            binding.extensionPrefsRecycler.adapter = ConcatAdapter(
+                concatAdapterConfig,
+                extHeaderAdapter,
+                PreferenceGroupAdapter(screen),
+            )
+            binding.extensionPrefsRecycler.addItemDecoration(ExtensionSettingsDividerItemDecoration(context))
+        } else {
+            val extension = presenter.extension ?: return
+
+            val dataStore = SharedPreferencesDataStore(
+                context.getSharedPreferences(extension.getPreferenceKey(), Context.MODE_PRIVATE),
+            )
+            manager.preferenceDataStore = dataStore
+            manager.onDisplayPreferenceDialogListener = this
+            val screen = manager.createPreferenceScreen(themedContext)
+            preferenceScreen = screen
+
+            val multiSource = extension.sources.size > 1
+            val isMultiLangSingleSource = multiSource && extension.sources.map { it.name }.distinct().size == 1
+            val languages = preferences.enabledLanguages().get()
+
+            for (source in extension.sources.sortedByDescending { it.isLangEnabled(languages) }) {
+                addPreferencesForSource(screen, source, multiSource, isMultiLangSingleSource)
+            }
+
+            manager.setPreferences(screen)
+
+            binding.extensionPrefsRecycler.layoutManager = LinearLayoutManagerAccurateOffset(context)
+            val concatAdapterConfig = ConcatAdapter.Config.Builder()
+                .setStableIdMode(ConcatAdapter.Config.StableIdMode.ISOLATED_STABLE_IDS)
+                .build()
+            screen.setShouldUseGeneratedIds(true)
+            val extHeaderAdapter = ExtensionDetailsHeaderAdapter(presenter)
+            extHeaderAdapter.setHasStableIds(true)
+            binding.extensionPrefsRecycler.adapter = ConcatAdapter(
+                concatAdapterConfig,
+                extHeaderAdapter,
+                PreferenceGroupAdapter(screen),
+            )
+            binding.extensionPrefsRecycler.addItemDecoration(ExtensionSettingsDividerItemDecoration(context))
         }
-
-        manager.setPreferences(screen)
-
-        binding.extensionPrefsRecycler.layoutManager = LinearLayoutManagerAccurateOffset(context)
-        val concatAdapterConfig = ConcatAdapter.Config.Builder()
-            .setStableIdMode(ConcatAdapter.Config.StableIdMode.ISOLATED_STABLE_IDS)
-            .build()
-        screen.setShouldUseGeneratedIds(true)
-        val extHeaderAdapter = ExtensionDetailsHeaderAdapter(presenter)
-        extHeaderAdapter.setHasStableIds(true)
-        binding.extensionPrefsRecycler.adapter = ConcatAdapter(
-            concatAdapterConfig,
-            extHeaderAdapter,
-            PreferenceGroupAdapter(screen),
-        )
-        binding.extensionPrefsRecycler.addItemDecoration(ExtensionSettingsDividerItemDecoration(context))
     }
 
     override fun onDestroyView(view: View) {
@@ -159,7 +194,12 @@ class ExtensionDetailsController(bundle: Bundle? = null) :
 
     override fun onPrepareOptionsMenu(menu: Menu) {
         val item = menu.findItem(R.id.action_open_repo)
-        item.isVisible = presenter.extension?.repoUrl != null
+        val repoUrl = if (presenter.isNovelExtension) {
+            presenter.novelExtension?.repoUrl
+        } else {
+            presenter.extension?.repoUrl
+        }
+        item.isVisible = repoUrl != null
         super.onPrepareOptionsMenu(menu)
     }
 
@@ -172,7 +212,12 @@ class ExtensionDetailsController(bundle: Bundle? = null) :
     }
 
     private fun openRepo() {
-        val url = getUrl(presenter.extension?.repoUrl) ?: return
+        val repoUrl = if (presenter.isNovelExtension) {
+            presenter.novelExtension?.repoUrl
+        } else {
+            presenter.extension?.repoUrl
+        }
+        val url = getUrl(repoUrl) ?: return
         openInBrowser(url)
     }
 
@@ -185,10 +230,17 @@ class ExtensionDetailsController(bundle: Bundle? = null) :
     }
 
     private fun clearCookies() {
-        val urls = presenter.extension?.sources
-            ?.filterIsInstance<HttpSource>()
-            ?.map { it.baseUrl }
-            ?.distinct() ?: emptyList()
+        val urls = if (presenter.isNovelExtension) {
+            // Novel extensions: get main URLs from novel sources
+            presenter.novelExtension?.sources
+                ?.map { it.mainUrl }
+                ?.distinct() ?: emptyList()
+        } else {
+            presenter.extension?.sources
+                ?.filterIsInstance<HttpSource>()
+                ?.map { it.baseUrl }
+                ?.distinct() ?: emptyList()
+        }
 
         val cleared = urls.sumOf {
             network.cookieJar.remove(it.toHttpUrl())
@@ -356,6 +408,8 @@ class ExtensionDetailsController(bundle: Bundle? = null) :
     }
 
     private fun Extension.getPreferenceKey(): String = "extension_$pkgName"
+    
+    private fun NovelExtension.Installed.getPreferenceKey(): String = "novel_extension_$pkgName"
 
     @Suppress("UNCHECKED_CAST")
     override fun <T : Preference> findPreference(key: CharSequence): T {

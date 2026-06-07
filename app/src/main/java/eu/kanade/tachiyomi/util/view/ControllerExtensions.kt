@@ -57,6 +57,7 @@ import eu.kanade.tachiyomi.ui.base.controller.BaseLegacyController
 import eu.kanade.tachiyomi.ui.base.controller.CrossFadeChangeHandler
 import eu.kanade.tachiyomi.ui.base.controller.DialogController
 import eu.kanade.tachiyomi.ui.base.controller.FadeChangeHandler
+import eu.kanade.tachiyomi.ui.base.controller.MorphSourceChangeHandler
 import eu.kanade.tachiyomi.ui.base.controller.OneWayFadeChangeHandler
 import eu.kanade.tachiyomi.ui.main.FloatingSearchInterface
 import eu.kanade.tachiyomi.ui.main.MainActivity
@@ -142,6 +143,13 @@ fun <T> Controller.liftAppbarWith(
     liftOnScroll: ((Boolean) -> Unit)? = null,
 ) {
     val recycler = recyclerOrNested as? RecyclerView ?: recyclerOrNested as? NestedScrollView ?: return
+    
+    // Early return if activityBinding is null (e.g., when hosted in non-MainActivity)
+    // This can happen when Controllers are launched from Activities other than MainActivity
+    if (activityBinding == null) {
+        return
+    }
+    
     if (padView) {
         var appBarHeight = (
             if ((fullAppBarHeight ?: 0) > 0) {
@@ -252,27 +260,32 @@ fun <T> Controller.liftAppbarWith(
             }
         },
     )
-    addLifecycleListener(
-        object : Controller.LifecycleListener() {
-            override fun onChangeStart(
-                controller: Controller,
-                changeHandler: ControllerChangeHandler,
-                changeType: ControllerChangeType,
-            ) {
-                super.onChangeStart(controller, changeHandler, changeType)
-                if (changeType.isEnter) {
-                    activityBinding?.appBar?.hideBigView(
-                        true,
-                        setTitleAlpha = this@liftAppbarWith !is MangaDetailsController,
-                    )
-                    activityBinding?.appBar?.setToolbarModeBy(this@liftAppbarWith)
-                    activityBinding?.appBar?.useTabsInPreLayout = false
-                    colorToolbar(isToolbarColored)
-                    activityBinding?.appBar?.updateAppBarAfterY(recycler)
-                }
+    val lifecycleListener = object : Controller.LifecycleListener() {
+        override fun onChangeStart(
+            controller: Controller,
+            changeHandler: ControllerChangeHandler,
+            changeType: ControllerChangeType,
+        ) {
+            super.onChangeStart(controller, changeHandler, changeType)
+            if (changeType.isEnter) {
+                activityBinding?.appBar?.hideBigView(
+                    true,
+                    setTitleAlpha = this@liftAppbarWith !is MangaDetailsController,
+                )
+                activityBinding?.appBar?.setToolbarModeBy(this@liftAppbarWith)
+                activityBinding?.appBar?.useTabsInPreLayout = false
+                colorToolbar(isToolbarColored)
+                activityBinding?.appBar?.updateAppBarAfterY(recycler)
             }
-        },
-    )
+        }
+
+        override fun postDestroyView(controller: Controller) {
+            super.postDestroyView(controller)
+            // Remove this listener to prevent memory leaks
+            controller.removeLifecycleListener(this)
+        }
+    }
+    addLifecycleListener(lifecycleListener)
 }
 
 fun Controller.scrollViewWith(
@@ -390,96 +403,102 @@ fun Controller.scrollViewWith(
     if ((this as? FloatingSearchInterface)?.showFloatingBar() == true && !includeTabView) {
         setAppBarBG(0f, false)
     }
-    addLifecycleListener(
-        object : Controller.LifecycleListener() {
-            override fun onChangeEnd(
-                controller: Controller,
-                changeHandler: ControllerChangeHandler,
-                changeType: ControllerChangeType,
-            ) {
-                super.onChangeEnd(controller, changeHandler, changeType)
-                if (changeType.isEnter) {
-                    if (fakeToolbarView?.parent != null) {
-                        val parent = fakeToolbarView?.parent as? ViewGroup ?: return
-                        parent.removeView(fakeToolbarView)
-                        fakeToolbarView = null
-                    }
-                    if (fakeBottomNavView?.parent != null) {
-                        val parent = fakeBottomNavView?.parent as? ViewGroup ?: return
-                        parent.removeView(fakeBottomNavView)
-                        fakeBottomNavView = null
-                    }
+    val lifecycleListener = object : Controller.LifecycleListener() {
+        override fun onChangeEnd(
+            controller: Controller,
+            changeHandler: ControllerChangeHandler,
+            changeType: ControllerChangeType,
+        ) {
+            super.onChangeEnd(controller, changeHandler, changeType)
+            if (changeType.isEnter) {
+                if (fakeToolbarView?.parent != null) {
+                    val parent = fakeToolbarView?.parent as? ViewGroup ?: return
+                    parent.removeView(fakeToolbarView)
+                    fakeToolbarView = null
+                }
+                if (fakeBottomNavView?.parent != null) {
+                    val parent = fakeBottomNavView?.parent as? ViewGroup ?: return
+                    parent.removeView(fakeBottomNavView)
+                    fakeBottomNavView = null
                 }
             }
+        }
 
-            override fun onChangeStart(
-                controller: Controller,
-                changeHandler: ControllerChangeHandler,
-                changeType: ControllerChangeType,
-            ) {
-                super.onChangeStart(controller, changeHandler, changeType)
-                isInView = changeType.isEnter
-                if (changeType.isEnter) {
-                    activityBinding?.appBar?.hideBigView(
-                        this@scrollViewWith is SmallToolbarInterface,
-                        setTitleAlpha = this@scrollViewWith !is MangaDetailsController,
-                    )
-                    activityBinding?.appBar?.setToolbarModeBy(this@scrollViewWith)
-                    activityBinding?.appBar?.useTabsInPreLayout = includeTabView
-                    colorToolbar(isToolbarColor)
-                    lastY = 0f
-                    activityBinding?.appBar?.updateAppBarAfterY(recycler)
-                    activityBinding?.toolbar?.tag = randomTag
-                    activityBinding?.toolbar?.setOnClickListener {
-                        if (recycler is RecyclerView) {
-                            recycler.smoothScrollToTop()
-                        } else if (recycler is NestedScrollView) {
-                            recycler.smoothScrollTo(0, 0)
-                        }
-                    }
-                } else {
-                    if (!customPadding && lastY == 0f && (
-                        (
-                            this@scrollViewWith !is FloatingSearchInterface && router.backstack.lastOrNull()
-                                ?.controller is MangaDetailsController
-                            ) || includeTabView
-                        )
-                    ) {
-                        val parent = recycler.parent as? ViewGroup ?: return
-                        val v = View(activity)
-                        fakeToolbarView = v
-                        parent.addView(v, parent.indexOfChild(recycler) + 1)
-                        val params = fakeToolbarView?.layoutParams
-                        params?.height = recycler.paddingTop
-                        params?.width = MATCH_PARENT
-                        v.setBackgroundColor(v.context.getResourceColor(R.attr.colorSurface))
-                        v.layoutParams = params
-                        onLeavingController?.invoke()
-                    }
-                    if (!customPadding && router.backstackSize == 2 && changeType == ControllerChangeType.PUSH_EXIT &&
-                        router.backstack.lastOrNull()?.controller !is DialogController
-                    ) {
-                        val parent = recycler.parent as? ViewGroup ?: return
-                        val bottomNav = activityBinding?.bottomNav ?: return
-                        val v = View(activity)
-                        fakeBottomNavView = v
-                        parent.addView(v)
-                        val params = fakeBottomNavView?.layoutParams
-                        params?.height = bottomNav.height
-                        (params as? FrameLayout.LayoutParams)?.gravity = Gravity.BOTTOM
-                        fakeBottomNavView?.translationY = bottomNav.translationY
-                        params?.width = MATCH_PARENT
-                        v.setBackgroundColor(v.context.getResourceColor(R.attr.colorPrimaryVariant))
-                        v.layoutParams = params
-                    }
-                    toolbarColorAnim?.cancel()
-                    if (activityBinding?.toolbar?.tag == randomTag) {
-                        activityBinding?.toolbar?.setOnClickListener(null)
+        override fun onChangeStart(
+            controller: Controller,
+            changeHandler: ControllerChangeHandler,
+            changeType: ControllerChangeType,
+        ) {
+            super.onChangeStart(controller, changeHandler, changeType)
+            isInView = changeType.isEnter
+            if (changeType.isEnter) {
+                activityBinding?.appBar?.hideBigView(
+                    this@scrollViewWith is SmallToolbarInterface,
+                    setTitleAlpha = this@scrollViewWith !is MangaDetailsController,
+                )
+                activityBinding?.appBar?.setToolbarModeBy(this@scrollViewWith)
+                activityBinding?.appBar?.useTabsInPreLayout = includeTabView
+                colorToolbar(isToolbarColor)
+                lastY = 0f
+                activityBinding?.appBar?.updateAppBarAfterY(recycler)
+                activityBinding?.toolbar?.tag = randomTag
+                activityBinding?.toolbar?.setOnClickListener {
+                    if (recycler is RecyclerView) {
+                        recycler.smoothScrollToTop()
+                    } else if (recycler is NestedScrollView) {
+                        recycler.smoothScrollTo(0, 0)
                     }
                 }
+            } else {
+                if (!customPadding && lastY == 0f && (
+                    (
+                        this@scrollViewWith !is FloatingSearchInterface && router.backstack.lastOrNull()
+                            ?.controller is MangaDetailsController
+                        ) || includeTabView
+                    )
+                ) {
+                    val parent = recycler.parent as? ViewGroup ?: return
+                    val v = View(activity)
+                    fakeToolbarView = v
+                    parent.addView(v, parent.indexOfChild(recycler) + 1)
+                    val params = fakeToolbarView?.layoutParams
+                    params?.height = recycler.paddingTop
+                    params?.width = MATCH_PARENT
+                    v.setBackgroundColor(v.context.getResourceColor(R.attr.colorSurface))
+                    v.layoutParams = params
+                    onLeavingController?.invoke()
+                }
+                if (!customPadding && router.backstackSize == 2 && changeType == ControllerChangeType.PUSH_EXIT &&
+                    router.backstack.lastOrNull()?.controller !is DialogController
+                ) {
+                    val parent = recycler.parent as? ViewGroup ?: return
+                    val bottomNav = activityBinding?.bottomNav ?: return
+                    val v = View(activity)
+                    fakeBottomNavView = v
+                    parent.addView(v)
+                    val params = fakeBottomNavView?.layoutParams
+                    params?.height = bottomNav.height
+                    (params as? FrameLayout.LayoutParams)?.gravity = Gravity.BOTTOM
+                    fakeBottomNavView?.translationY = bottomNav.translationY
+                    params?.width = MATCH_PARENT
+                    v.setBackgroundColor(v.context.getResourceColor(R.attr.colorPrimaryVariant))
+                    v.layoutParams = params
+                }
+                toolbarColorAnim?.cancel()
+                if (activityBinding?.toolbar?.tag == randomTag) {
+                    activityBinding?.toolbar?.setOnClickListener(null)
+                }
             }
-        },
-    )
+        }
+
+        override fun postDestroyView(controller: Controller) {
+            super.postDestroyView(controller)
+            // Remove this listener to prevent memory leaks - the captured recycler reference
+            // would otherwise keep the old Activity alive
+            controller.removeLifecycleListener(this)
+        }
+    }
+    addLifecycleListener(lifecycleListener)
     colorToolbar(!atTopOfRecyclerView())
 
     recycler.post {
@@ -795,6 +814,16 @@ fun Controller.withFadeInTransaction(): RouterTransaction {
     return RouterTransaction.with(this)
         .pushChangeHandler(FadeChangeHandler())
         .popChangeHandler(OneWayFadeChangeHandler())
+}
+
+/**
+ * Creates a morph-in-place transaction for Browse → BrowseSource navigation.
+ * Uses 0ms transition with manual coordinated animations.
+ */
+fun Controller.withMorphTransition(): RouterTransaction {
+    return RouterTransaction.with(this)
+        .pushChangeHandler(MorphSourceChangeHandler(isReverse = false))
+        .popChangeHandler(MorphSourceChangeHandler(isReverse = true))
 }
 
 fun Controller.openInBrowser(url: String?) {

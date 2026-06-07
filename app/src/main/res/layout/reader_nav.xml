@@ -68,12 +68,15 @@
 
         <eu.kanade.tachiyomi.ui.reader.ReaderSlider
             android:id="@+id/page_seekbar"
+            style="@style/Widget.Tachiyomi.Slider"
             android:layout_width="0dp"
             android:layout_height="40dp"
             android:layout_weight="1"
             android:maxHeight="?attr/actionBarSize"
             android:minHeight="?attr/actionBarSize"
             android:stepSize="1"
+            app:trackHeight="4dp"
+            app:thumbRadius="8dp"
             tools:value="4"
             tools:valueTo="10"
             tools:ignore="SpeakableTextPresentCheck" />

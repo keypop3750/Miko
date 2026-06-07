@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:paddingTop="16dp">
+
+    <!-- Header -->
+    <TextView
+        android:id="@+id/sheet_title"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:text="@string/filter"
+        android:textAppearance="?attr/textAppearanceTitleLarge"
+        android:paddingStart="24dp"
+        android:paddingEnd="24dp"
+        android:paddingBottom="16dp"
+        app:layout_constraintEnd_toStartOf="@id/close_button"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <ImageButton
+        android:id="@+id/close_button"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:src="@drawable/ic_close_24dp"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:contentDescription="@string/close"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        android:layout_marginEnd="8dp" />
+
+    <!-- NSFW Toggle -->
+    <TextView
+        android:id="@+id/nsfw_label"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:text="Include NSFW content"
+        android:textAppearance="?attr/textAppearanceBodyLarge"
+        android:paddingStart="24dp"
+        android:paddingTop="8dp"
+        app:layout_constraintEnd_toStartOf="@id/nsfw_switch"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/sheet_title" />
+
+    <com.google.android.material.switchmaterial.SwitchMaterial
+        android:id="@+id/nsfw_switch"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toTopOf="@id/nsfw_label"
+        app:layout_constraintBottom_toBottomOf="@id/nsfw_label"
+        android:layout_marginEnd="24dp" />
+
+    <!-- Sources Section -->
+    <TextView
+        android:id="@+id/sources_header"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:text="@string/sources"
+        android:textAppearance="?attr/textAppearanceTitleMedium"
+        android:paddingStart="24dp"
+        android:paddingEnd="24dp"
+        android:paddingTop="24dp"
+        android:paddingBottom="8dp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/nsfw_label" />
+
+    <TextView
+        android:id="@+id/source_count_text"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:textAppearance="?attr/textAppearanceBodySmall"
+        android:paddingStart="24dp"
+        android:paddingEnd="24dp"
+        android:paddingBottom="8dp"
+        tools:text="All sources (5)"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/sources_header" />
+
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/sources_recycler"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:maxHeight="300dp"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp"
+        android:clipToPadding="false"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/source_count_text"
+        app:layout_constraintBottom_toTopOf="@id/button_container"
+        tools:listitem="@layout/source_filter_item" />
+
+    <!-- Action Buttons -->
+    <LinearLayout
+        android:id="@+id/button_container"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:padding="16dp"
+        android:gravity="end"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/sources_recycler">
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/reset_button"
+            style="@style/Widget.Material3.Button.TextButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/reset"
+            android:layout_marginEnd="8dp" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/apply_button"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/apply" />
+    </LinearLayout>
+
+</androidx.constraintlayout.widget.ConstraintLayout>

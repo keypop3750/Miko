@@ -1,0 +1,2 @@
+-- Add chapter_flags column to novels table for storing chapter sorting/filtering preferences
+ALTER TABLE novels ADD COLUMN chapter_flags INTEGER NOT NULL DEFAULT 0;

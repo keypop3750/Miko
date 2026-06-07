@@ -48,12 +48,12 @@ class ExtensionRepoScreenModel : StateScreenModel<ExtensionRepoScreenModel.State
         screenModelScope.launchIO {
             when (val result = createExtensionRepo.await(url)) {
                 is CreateExtensionRepo.Result.Success -> internalEvent.value = ExtensionRepoEvent.Success
+                is CreateExtensionRepo.Result.InvalidUrl,
                 is CreateExtensionRepo.Result.Error -> internalEvent.value = ExtensionRepoEvent.InvalidUrl
                 is CreateExtensionRepo.Result.RepoAlreadyExists -> internalEvent.value = ExtensionRepoEvent.RepoAlreadyExists
                 is CreateExtensionRepo.Result.DuplicateFingerprint -> {
                     internalEvent.value = ExtensionRepoEvent.ShowDialog(RepoDialog.Conflict(result.oldRepo, result.newRepo))
                 }
-                else -> internalEvent.value = ExtensionRepoEvent.NoOp
             }
         }
     }

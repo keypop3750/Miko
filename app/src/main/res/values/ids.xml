@@ -2,4 +2,8 @@
 <resources>
 
     <item name="reader_pager" type="id"/>
+    
+    <!-- View tags for shared element transition click coordinates -->
+    <item name="tag_click_x" type="id"/>
+    <item name="tag_click_y" type="id"/>
 </resources>

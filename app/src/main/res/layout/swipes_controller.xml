@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    SwipesController Layout
+    
+    Controller-based layout for seamless integration with MainActivity's navigation.
+    This is used by SwipesController (Conductor-based) instead of SwipesActivity.
+    
+    Key difference from swipes_activity.xml:
+    - No BottomNavigationView (MainActivity provides it)
+    - Designed to work within MainActivity's content area
+-->
+<androidx.coordinatorlayout.widget.CoordinatorLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="?attr/colorSurface">
+
+    <!-- Main Content Area (Card Stack) -->
+    <FrameLayout
+        android:id="@+id/card_stack_container"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+
+        <!-- CardStackView for Tinder-style swiping -->
+        <com.yuyakaido.android.cardstackview.CardStackView
+            android:id="@+id/card_stack_view"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:clipChildren="false"
+            android:clipToPadding="false"
+            android:padding="8dp" />
+
+        <!-- Loading indicator -->
+        <LinearLayout
+            android:id="@+id/loading_state"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:orientation="vertical"
+            android:paddingStart="32dp"
+            android:paddingEnd="32dp"
+            android:visibility="gone"
+            tools:visibility="visible">
+
+            <com.google.android.material.progressindicator.CircularProgressIndicator
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                android:layout_marginBottom="16dp"
+                android:indeterminate="true" />
+
+            <TextView
+                style="?textAppearanceLabelLarge"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                android:text="Loading recommendations..."
+                android:textAlignment="center"
+                tools:ignore="HardcodedText" />
+        </LinearLayout>
+
+        <!-- Empty state when no cards available -->
+        <LinearLayout
+            android:id="@+id/empty_state"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:orientation="vertical"
+            android:paddingStart="32dp"
+            android:paddingEnd="32dp"
+            android:visibility="gone"
+            android:alpha="0"
+            tools:visibility="visible">
+
+            <ImageView
+                android:layout_width="128dp"
+                android:layout_height="128dp"
+                android:layout_gravity="center"
+                android:layout_marginBottom="16dp"
+                android:src="@drawable/ic_browse_outline_24dp"
+                android:contentDescription="No content available"
+                app:tint="?android:attr/textColorSecondary"
+                tools:ignore="HardcodedText" />
+
+            <TextView
+                android:id="@+id/empty_state_title"
+                style="?textAppearanceHeadlineSmall"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                android:text="No more content to swipe"
+                android:textAlignment="center"
+                tools:ignore="HardcodedText" />
+
+            <TextView
+                android:id="@+id/empty_state_subtitle"
+                style="?textAppearanceLabelMedium"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                android:layout_marginTop="8dp"
+                android:text="Add more sources in Browse or adjust your filters"
+                android:textAlignment="center"
+                tools:ignore="HardcodedText" />
+        </LinearLayout>
+    </FrameLayout>
+
+</androidx.coordinatorlayout.widget.CoordinatorLayout>

@@ -1,0 +1,465 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:padding="16dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <!-- Font Settings Section -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/font_size"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:paddingBottom="8dp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingBottom="16dp">
+
+            <Button
+                android:id="@+id/font_size_decrease"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:text="-"
+                android:textSize="20sp"
+                style="@style/Widget.Material3.Button.OutlinedButton" />
+
+            <com.google.android.material.slider.Slider
+                android:id="@+id/font_size_slider"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginHorizontal="16dp" />
+
+            <Button
+                android:id="@+id/font_size_increase"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:text="+"
+                android:textSize="20sp"
+                style="@style/Widget.Material3.Button.OutlinedButton" />
+
+            <TextView
+                android:id="@+id/font_size_value"
+                android:layout_width="60dp"
+                android:layout_height="wrap_content"
+                android:text="16sp"
+                android:textAlignment="center"
+                android:layout_marginStart="8dp" />
+
+        </LinearLayout>
+
+        <!-- Font Family -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Font Family"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:paddingBottom="8dp" />
+
+        <com.google.android.material.button.MaterialButtonToggleGroup
+            android:id="@+id/font_family_toggle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="16dp"
+            app:singleSelection="true">
+
+            <Button
+                android:id="@+id/font_default"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Default"
+                style="@style/Widget.Material3.Button.OutlinedButton" />
+
+            <Button
+                android:id="@+id/font_serif"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Serif"
+                style="@style/Widget.Material3.Button.OutlinedButton" />
+
+            <Button
+                android:id="@+id/font_sans_serif"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Sans"
+                style="@style/Widget.Material3.Button.OutlinedButton" />
+
+            <Button
+                android:id="@+id/font_monospace"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Mono"
+                style="@style/Widget.Material3.Button.OutlinedButton" />
+
+        </com.google.android.material.button.MaterialButtonToggleGroup>
+
+        <!-- Line Spacing -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/line_spacing"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:paddingBottom="8dp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingBottom="16dp">
+
+            <com.google.android.material.slider.Slider
+                android:id="@+id/line_spacing_slider"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1" />
+
+            <TextView
+                android:id="@+id/line_spacing_value"
+                android:layout_width="60dp"
+                android:layout_height="wrap_content"
+                android:text="1.5x"
+                android:textAlignment="center"
+                android:layout_marginStart="8dp" />
+
+        </LinearLayout>
+
+        <!-- Letter Spacing -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Letter Spacing"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:paddingBottom="8dp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingBottom="16dp">
+
+            <com.google.android.material.slider.Slider
+                android:id="@+id/letter_spacing_slider"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1" />
+
+            <TextView
+                android:id="@+id/letter_spacing_value"
+                android:layout_width="60dp"
+                android:layout_height="wrap_content"
+                android:text="0.05"
+                android:textAlignment="center"
+                android:layout_marginStart="8dp" />
+
+        </LinearLayout>
+
+        <!-- Theme Settings -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/theme"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:paddingTop="16dp"
+            android:paddingBottom="8dp" />
+
+        <com.google.android.material.button.MaterialButtonToggleGroup
+            android:id="@+id/theme_toggle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="16dp"
+            app:singleSelection="true">
+
+            <Button
+                android:id="@+id/theme_light"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/light"
+                style="@style/Widget.Material3.Button.OutlinedButton" />
+
+            <Button
+                android:id="@+id/theme_dark"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Dark"
+                style="@style/Widget.Material3.Button.OutlinedButton" />
+
+            <Button
+                android:id="@+id/theme_sepia"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/sepia"
+                style="@style/Widget.Material3.Button.OutlinedButton" />
+
+            <Button
+                android:id="@+id/theme_oled"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="OLED"
+                style="@style/Widget.Material3.Button.OutlinedButton" />
+
+        </com.google.android.material.button.MaterialButtonToggleGroup>
+
+        <!-- Color customization buttons -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:paddingBottom="16dp">
+
+            <Button
+                android:id="@+id/background_color_button"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginEnd="8dp"
+                android:text="Background"
+                style="@style/Widget.Material3.Button.OutlinedButton" />
+
+            <Button
+                android:id="@+id/text_color_button"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginStart="8dp"
+                android:text="Text Color"
+                style="@style/Widget.Material3.Button.OutlinedButton" />
+
+        </LinearLayout>
+
+        <!-- Text Alignment -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Text Alignment"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:paddingBottom="8dp" />
+
+        <com.google.android.material.button.MaterialButtonToggleGroup
+            android:id="@+id/alignment_toggle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="16dp"
+            app:singleSelection="true">
+
+            <Button
+                android:id="@+id/align_left"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Left"
+                style="@style/Widget.Material3.Button.OutlinedButton" />
+
+            <Button
+                android:id="@+id/align_center"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Center"
+                style="@style/Widget.Material3.Button.OutlinedButton" />
+
+            <Button
+                android:id="@+id/align_justify"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Justify"
+                style="@style/Widget.Material3.Button.OutlinedButton" />
+
+        </com.google.android.material.button.MaterialButtonToggleGroup>
+
+        <!-- Margins -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Horizontal Margin"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:paddingBottom="8dp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingBottom="16dp">
+
+            <com.google.android.material.slider.Slider
+                android:id="@+id/margin_horizontal_slider"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1" />
+
+            <TextView
+                android:id="@+id/margin_horizontal_value"
+                android:layout_width="60dp"
+                android:layout_height="wrap_content"
+                android:text="16dp"
+                android:textAlignment="center"
+                android:layout_marginStart="8dp" />
+
+        </LinearLayout>
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Vertical Margin"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:paddingBottom="8dp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingBottom="16dp">
+
+            <com.google.android.material.slider.Slider
+                android:id="@+id/margin_vertical_slider"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1" />
+
+            <TextView
+                android:id="@+id/margin_vertical_value"
+                android:layout_width="60dp"
+                android:layout_height="wrap_content"
+                android:text="24dp"
+                android:textAlignment="center"
+                android:layout_marginStart="8dp" />
+
+        </LinearLayout>
+
+        <!-- Paragraph Settings -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Paragraph Spacing"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:paddingBottom="8dp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingBottom="16dp">
+
+            <com.google.android.material.slider.Slider
+                android:id="@+id/paragraph_spacing_slider"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1" />
+
+            <TextView
+                android:id="@+id/paragraph_spacing_value"
+                android:layout_width="60dp"
+                android:layout_height="wrap_content"
+                android:text="12dp"
+                android:textAlignment="center"
+                android:layout_marginStart="8dp" />
+
+        </LinearLayout>
+
+        <com.google.android.material.switchmaterial.SwitchMaterial
+            android:id="@+id/paragraph_indent_switch"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Paragraph Indent"
+            android:layout_marginBottom="16dp" />
+
+        <!-- Behavior Settings -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Reading Behavior"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:paddingTop="16dp"
+            android:paddingBottom="8dp" />
+
+        <com.google.android.material.switchmaterial.SwitchMaterial
+            android:id="@+id/keep_screen_on_switch"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Keep Screen On"
+            android:layout_marginBottom="8dp" />
+
+        <com.google.android.material.switchmaterial.SwitchMaterial
+            android:id="@+id/fullscreen_switch"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Fullscreen Mode"
+            android:layout_marginBottom="8dp" />
+
+        <com.google.android.material.switchmaterial.SwitchMaterial
+            android:id="@+id/volume_keys_switch"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Volume Keys Scrolling"
+            android:layout_marginBottom="8dp" />
+
+        <com.google.android.material.switchmaterial.SwitchMaterial
+            android:id="@+id/tap_to_scroll_switch"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Tap to Scroll"
+            android:layout_marginBottom="16dp" />
+
+        <!-- Preview -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Preview"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:paddingBottom="8dp" />
+
+        <TextView
+            android:id="@+id/preview_text"
+            android:layout_width="match_parent"
+            android:layout_height="120dp"
+            android:text="This is a preview of how your text will appear with the current settings. You can adjust font size, line spacing, and other options above."
+            android:padding="12dp"
+            android:background="@drawable/settings_panel_background"
+            android:layout_marginBottom="16dp" />
+
+        <!-- Reset Button -->
+        <Button
+            android:id="@+id/reset_defaults_button"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Reset to Defaults"
+            style="@style/Widget.Material3.Button.OutlinedButton"
+            android:layout_marginBottom="16dp" />
+
+    </LinearLayout>
+
+</ScrollView>

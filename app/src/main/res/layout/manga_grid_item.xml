@@ -19,7 +19,6 @@
         <com.google.android.material.card.MaterialCardView
             android:id="@+id/card"
             android:layout_width="match_parent"
-            app:strokeColor="@color/library_stroke_selector"
             android:layout_height="wrap_content"
             android:layout_gravity="bottom"
             android:layout_marginStart="6dp"
@@ -29,7 +28,10 @@
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toTopOf="parent"
-            app:layout_constraintVertical_bias="1.0">
+            app:layout_constraintVertical_bias="1.0"
+            app:cardElevation="0dp"
+            app:cardCornerRadius="12dp"
+            app:strokeWidth="0dp">
 
             <androidx.constraintlayout.widget.ConstraintLayout
                 android:id="@+id/cover_constraint"
@@ -83,6 +85,7 @@
 
             </androidx.constraintlayout.widget.ConstraintLayout>
 
+            <!-- Continue reading button (play icon for manga at top-right, book icon for novels at bottom-right) -->
             <FrameLayout
                 android:id="@+id/play_layout"
                 android:layout_width="50dp"

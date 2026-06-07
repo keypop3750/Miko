@@ -1,0 +1,2 @@
+-- Add filtered_translators column to novels table for translator filtering
+ALTER TABLE novels ADD COLUMN filtered_translators TEXT;

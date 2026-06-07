@@ -104,6 +104,34 @@
                 android:resource="@xml/s_pen_actions" />
         </activity>
         <activity
+            android:name=".ui.novel.reader.NovelReaderActivity"
+            android:theme="@style/Theme.Tachiyomi.SplashScreen"
+            android:exported="false"/>
+        <activity
+            android:name=".ui.novel.reader.NovelHighlightsActivity"
+            android:theme="@style/Theme.Tachiyomi"
+            android:exported="false"/>
+        <!-- Manga Details Activity (Activity-based implementation) -->
+        <activity
+            android:name=".ui.manga.MangaDetailsActivity"
+            android:theme="@style/Theme.Tachiyomi"
+            android:configChanges="orientation|screenSize|screenLayout"
+            android:windowSoftInputMode="adjustResize"
+            android:exported="false">
+            <!-- Enable shared element transitions -->
+            <meta-data
+                android:name="android.app.ACTIVITY_TRANSITIONS"
+                android:value="true" />
+        </activity>
+        <!-- Swipes Activity (Tinder-style manga discovery) -->
+        <activity
+            android:name=".ui.swipes.SwipesActivity"
+            android:theme="@style/Theme.Tachiyomi"
+            android:configChanges="orientation|screenSize|screenLayout"
+            android:windowSoftInputMode="adjustResize"
+            android:exported="false"
+            android:parentActivityName=".ui.main.MainActivity" />
+        <activity
             android:name=".ui.webview.WebViewActivity"
             android:configChanges="uiMode|orientation|screenSize"/>
         <activity
@@ -173,6 +201,12 @@
             android:name=".extension.util.ExtensionInstallActivity"
             android:icon="@mipmap/ic_launcher"
             android:theme="@android:style/Theme.Translucent.NoTitleBar"/>
+
+        <activity
+            android:name=".extension.novel.util.NovelExtensionInstallActivity"
+            android:icon="@mipmap/ic_launcher"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar"
+            android:exported="false"/>
 
         <activity
             android:name="com.google.android.gms.oss.licenses.OssLicensesMenuActivity"

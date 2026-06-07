@@ -1,0 +1,14 @@
+-- Migration 32: Add swipes_blacklist table for Swipes feature
+-- This table stores manga that the user has blacklisted (swiped left on) in the Swipes feature
+
+CREATE TABLE swipes_blacklist(
+    manga_url TEXT NOT NULL,
+    source_id INTEGER NOT NULL,
+    manga_title TEXT NOT NULL,
+    cover_url TEXT,
+    blacklisted_at INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY(manga_url, source_id)
+);
+
+CREATE INDEX swipes_blacklist_source_id_index ON swipes_blacklist(source_id);
+CREATE INDEX swipes_blacklist_blacklisted_at_index ON swipes_blacklist(blacklisted_at);

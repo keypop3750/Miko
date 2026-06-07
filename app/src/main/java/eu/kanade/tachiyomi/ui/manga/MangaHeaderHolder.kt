@@ -89,7 +89,9 @@ class MangaHeaderHolder(
             chapterLayout.setOnClickListener { adapter.delegate.showChapterFilter() }
             startReadingButton.setOnClickListener { adapter.delegate.readNextChapter(it) }
             topView.updateLayoutParams<ConstraintLayout.LayoutParams> {
-                height = adapter.delegate.topCoverHeight()
+                val newHeight = adapter.delegate.topCoverHeight()
+                android.util.Log.e("MangaHeaderHolder", "🔍 Setting topView height to: $newHeight")
+                height = newHeight
             }
             moreButton.setOnClickListener {
                 expandDesc(true)
@@ -119,8 +121,8 @@ class MangaHeaderHolder(
                 }
                 if (event.actionMasked == MotionEvent.ACTION_UP) {
                     hadSelection = mangaSummary.hasSelection()
-                    (adapter.delegate as MangaDetailsController).binding.swipeRefresh.isEnabled =
-                        true
+                    // Use interface method instead of casting to Controller
+                    adapter.delegate.setSwipeRefreshEnabled(true)
                 }
                 false
             }
@@ -194,7 +196,7 @@ class MangaHeaderHolder(
     private fun expandDesc(animated: Boolean = false) {
         binding ?: return
         if (binding.moreButton.visibility == View.VISIBLE || isTablet) {
-            androidx.transition.TransitionManager.endTransitions(adapter.controller.binding.recycler)
+            androidx.transition.TransitionManager.endTransitions(adapter.binding.recycler)
             binding.mangaSummary.maxLines = Integer.MAX_VALUE
             binding.mangaSummary.setTextIsSelectable(true)
             setDescription()
@@ -218,7 +220,7 @@ class MangaHeaderHolder(
                     AR.integer.config_shortAnimTime,
                 ).toLong()
                 androidx.transition.TransitionManager.beginDelayedTransition(
-                    adapter.controller.binding.recycler,
+                    adapter.binding.recycler,
                     transition,
                 )
             }
@@ -230,7 +232,7 @@ class MangaHeaderHolder(
         if (isTablet || !canCollapse) return
         binding.moreButtonGroup.isVisible = !isTablet
         if (animated) {
-            androidx.transition.TransitionManager.endTransitions(adapter.controller.binding.recycler)
+            androidx.transition.TransitionManager.endTransitions(adapter.binding.recycler)
             val animVector = AnimatedVectorDrawableCompat.create(
                 binding.root.context,
                 R.drawable.anim_expand_less_to_more,
@@ -249,7 +251,7 @@ class MangaHeaderHolder(
                 AR.integer.config_shortAnimTime,
             ).toLong()
             androidx.transition.TransitionManager.beginDelayedTransition(
-                adapter.controller.binding.recycler,
+                adapter.binding.recycler,
                 transition,
             )
         }
@@ -268,7 +270,7 @@ class MangaHeaderHolder(
 
     private fun setDescription() {
         if (binding != null) {
-            val desc = adapter.controller.mangaPresenter().manga.description
+            val desc = adapter.delegate.mangaPresenter().manga.description
             binding.mangaSummary.text = when {
                 desc.isNullOrBlank() -> itemView.context.getString(MR.strings.no_description)
                 binding.mangaSummary.maxLines != Int.MAX_VALUE -> desc.replace(
@@ -671,7 +673,7 @@ class MangaHeaderHolder(
     fun updateCover(manga: Manga) {
         binding ?: return
         if (!manga.initialized) return
-        val drawable = adapter.controller.binding.mangaCoverFull.drawable
+        val drawable = adapter.binding.mangaCoverFull.drawable
         binding.mangaCover.loadManga(manga) {
             placeholder(drawable)
             error(drawable)

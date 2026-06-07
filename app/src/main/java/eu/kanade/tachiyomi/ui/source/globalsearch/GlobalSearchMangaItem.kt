@@ -56,6 +56,7 @@ class GlobalSearchMangaItem(
     ) {
         job?.cancel()
         job = null
+        holder?.resetAnimationState()
     }
 
     override fun equals(other: Any?): Boolean {

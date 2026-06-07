@@ -1,0 +1,115 @@
+import kotlin.Boolean;
+
+-- Novel chapters (completely separate from manga chapters)
+CREATE TABLE novel_chapters (
+    _id INTEGER PRIMARY KEY,
+    novel_id INTEGER NOT NULL,
+    url TEXT NOT NULL,
+    title TEXT NOT NULL,
+    chapter_number REAL NOT NULL,
+    volume_number REAL,
+    word_count INTEGER DEFAULT 0,
+    read INTEGER AS Boolean NOT NULL DEFAULT 0,
+    bookmark INTEGER AS Boolean NOT NULL DEFAULT 0,
+    source_order INTEGER NOT NULL,
+    date_fetch INTEGER NOT NULL,
+    date_upload INTEGER NOT NULL,
+    last_read_position INTEGER NOT NULL DEFAULT 0,
+    reading_time_ms INTEGER NOT NULL DEFAULT 0,
+    translator TEXT,
+    FOREIGN KEY(novel_id) REFERENCES novels(_id) ON DELETE CASCADE,
+    UNIQUE(novel_id, url)
+);
+
+-- Indexes for performance
+CREATE INDEX novel_chapters_novel_id_index ON novel_chapters(novel_id);
+CREATE INDEX novel_chapters_unread_index ON novel_chapters(novel_id, read) WHERE read = 0;
+CREATE INDEX novel_chapters_url_index ON novel_chapters(url);
+
+-- Novel chapter queries
+getChaptersByNovelId:
+SELECT *
+FROM novel_chapters
+WHERE novel_id = :novel_id
+ORDER BY source_order ASC;
+
+getChapterById:
+SELECT *
+FROM novel_chapters
+WHERE _id = :chapter_id;
+
+getChapterByUrl:
+SELECT *
+FROM novel_chapters
+WHERE novel_id = :novel_id AND url = :url
+LIMIT 1;
+
+insertChapter:
+INSERT OR IGNORE INTO novel_chapters(novel_id, url, title, chapter_number, volume_number, word_count, read, bookmark, source_order, date_fetch, date_upload, last_read_position, reading_time_ms, translator)
+VALUES (:novel_id, :url, :title, :chapter_number, :volume_number, :word_count, :read, :bookmark, :source_order, :date_fetch, :date_upload, :last_read_position, :reading_time_ms, :translator);
+
+updateChapter:
+UPDATE novel_chapters SET
+    title = coalesce(:title, title),
+    chapter_number = coalesce(:chapter_number, chapter_number),
+    volume_number = coalesce(:volume_number, volume_number),
+    word_count = coalesce(:word_count, word_count),
+    read = coalesce(:read, read),
+    bookmark = coalesce(:bookmark, bookmark),
+    source_order = coalesce(:source_order, source_order),
+    date_fetch = coalesce(:date_fetch, date_fetch),
+    date_upload = coalesce(:date_upload, date_upload),
+    last_read_position = coalesce(:last_read_position, last_read_position),
+    reading_time_ms = coalesce(:reading_time_ms, reading_time_ms),
+    translator = coalesce(:translator, translator)
+WHERE _id = :chapter_id;
+
+markChapterRead:
+UPDATE novel_chapters SET
+    read = :read,
+    last_read_position = :last_read_position,
+    reading_time_ms = :reading_time_ms
+WHERE _id = :chapter_id;
+
+updateReadingProgress:
+UPDATE novel_chapters SET
+    last_read_position = :last_read_position,
+    reading_time_ms = :reading_time_ms
+WHERE _id = :chapter_id;
+
+getReadingPosition:
+SELECT _id AS chapter_id, last_read_position, reading_time_ms
+FROM novel_chapters
+WHERE _id = :chapter_id;
+
+deleteChapter:
+DELETE FROM novel_chapters
+WHERE _id = :chapter_id;
+
+selectLastInsertedRowId:
+SELECT last_insert_rowid();
+
+-- Library metadata queries for LibraryPresenter TODO items
+countUnreadChaptersByNovelId:
+SELECT COUNT(*)
+FROM novel_chapters
+WHERE novel_id = :novel_id AND read = 0;
+
+countTotalChaptersByNovelId:
+SELECT COUNT(*)
+FROM novel_chapters
+WHERE novel_id = :novel_id;
+
+countDownloadedChaptersByNovelId:
+SELECT COUNT(*)
+FROM novel_chapters
+WHERE novel_id = :novel_id 
+AND last_read_position > 0;
+
+getLastReadChapterByNovelId:
+SELECT title, chapter_number, date_fetch AS last_read
+FROM novel_chapters
+WHERE novel_id = :novel_id 
+AND read = 1
+ORDER BY date_fetch DESC
+LIMIT 1;

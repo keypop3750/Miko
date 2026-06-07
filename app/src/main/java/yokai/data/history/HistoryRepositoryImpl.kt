@@ -3,6 +3,7 @@ package yokai.data.history
 import eu.kanade.tachiyomi.data.database.models.History
 import eu.kanade.tachiyomi.data.database.models.MangaChapterHistory
 import eu.kanade.tachiyomi.util.system.toInt
+import yokai.core.content.ContentType
 import yokai.data.DatabaseHandler
 import yokai.domain.history.HistoryRepository
 
@@ -13,7 +14,7 @@ class HistoryRepositoryImpl(private val handler: DatabaseHandler) : HistoryRepos
             historyQueries.selectLastInsertedRowId()
         }
 
-    override suspend fun bulkUpsert(histories: List<History>) =
+    override suspend fun bulkUpsert(histories: List<History>) {
         handler.await(true) {
             histories.forEach { history ->
                 historyQueries.upsert(
@@ -23,6 +24,7 @@ class HistoryRepositoryImpl(private val handler: DatabaseHandler) : HistoryRepos
                 )
             }
         }
+    }
 
     override suspend fun getByMangaId(mangaId: Long): History? =
         handler.awaitOneOrNull { historyQueries.getByMangaId(mangaId, History::mapper) }
@@ -35,23 +37,56 @@ class HistoryRepositoryImpl(private val handler: DatabaseHandler) : HistoryRepos
         search: String,
         limit: Long,
         offset: Long,
-    ): List<MangaChapterHistory> =
-        handler.awaitList { historyQueries.getRecentsUngrouped(search, filterScanlators.toInt().toLong(), limit, offset, MangaChapterHistory::mapper) }
+        contentType: Long,
+    ): List<MangaChapterHistory> {
+        // Route to novel queries when content type is NOVEL
+        if (contentType == ContentType.NOVEL.value.toLong()) {
+            return handler.awaitList { 
+                novel_historyQueries.getRecentsUngrouped(search, limit, offset, MangaChapterHistory::novelMapper) 
+            }
+        }
+        // Default to manga queries
+        return handler.awaitList { 
+            historyQueries.getRecentsUngrouped(search, filterScanlators.toInt().toLong(), contentType, limit, offset, MangaChapterHistory::mapper) 
+        }
+    }
 
     override suspend fun getRecentsBySeries(
         filterScanlators: Boolean,
         search: String,
         limit: Long,
         offset: Long,
-    ): List<MangaChapterHistory> =
-        handler.awaitList { historyQueries.getRecentsBySeries(search, filterScanlators.toInt().toLong(), limit, offset, MangaChapterHistory::mapper) }
+        contentType: Long,
+    ): List<MangaChapterHistory> {
+        // Route to novel queries when content type is NOVEL
+        if (contentType == ContentType.NOVEL.value.toLong()) {
+            return handler.awaitList { 
+                novel_historyQueries.getRecentsBySeries(search, limit, offset, MangaChapterHistory::novelMapper) 
+            }
+        }
+        // Default to manga queries
+        return handler.awaitList { 
+            historyQueries.getRecentsBySeries(search, filterScanlators.toInt().toLong(), contentType, limit, offset, MangaChapterHistory::mapper) 
+        }
+    }
 
     override suspend fun getRecentsAll(
         includeRead: Boolean,
         filterScanlators: Boolean,
         search: String,
         limit: Long,
-        offset: Long
-    ): List<MangaChapterHistory> =
-        handler.awaitList { historyQueries.getRecentsAll(includeRead.toInt().toLong(), search, filterScanlators.toInt().toLong(), limit, offset, MangaChapterHistory::mapper) }
+        offset: Long,
+        contentType: Long,
+    ): List<MangaChapterHistory> {
+        // Route to novel queries when content type is NOVEL
+        if (contentType == ContentType.NOVEL.value.toLong()) {
+            return handler.awaitList { 
+                novel_historyQueries.getRecentsAll(includeRead.toInt().toLong(), search, limit, offset, MangaChapterHistory::novelMapperNullable) 
+            }
+        }
+        // Default to manga queries
+        return handler.awaitList { 
+            historyQueries.getRecentsAll(includeRead.toInt().toLong(), contentType, search, filterScanlators.toInt().toLong(), limit, offset, MangaChapterHistory::mapper) 
+        }
+    }
 }

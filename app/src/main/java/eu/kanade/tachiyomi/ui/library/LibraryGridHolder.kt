@@ -11,6 +11,7 @@ import androidx.core.view.isVisible
 import androidx.core.view.marginBottom
 import androidx.core.view.updateLayoutParams
 import coil3.dispose
+import coil3.imageLoader
 import coil3.size.Scale
 import eu.kanade.tachiyomi.R
 import eu.kanade.tachiyomi.data.database.models.dominantCoverColors
@@ -22,7 +23,9 @@ import eu.kanade.tachiyomi.util.system.dpToPx
 import eu.kanade.tachiyomi.util.system.getResourceColor
 import eu.kanade.tachiyomi.util.view.backgroundColor
 import eu.kanade.tachiyomi.util.view.setCards
+import yokai.util.coil.loadNovel
 import eu.kanade.tachiyomi.widget.AutofitRecyclerView
+import yokai.util.coil.asTarget
 import yokai.util.coil.loadManga
 
 /**
@@ -41,7 +44,24 @@ class LibraryGridHolder(
 ) : LibraryHolder(view, adapter) {
 
     private val binding = MangaGridItemBinding.bind(view)
+    
+    // Track last touch coordinates for shared element transitions
+    private var lastTouchX: Float = 0f
+    private var lastTouchY: Float = 0f
+    
     init {
+        // Capture touch coordinates for shared element transitions
+        itemView.setOnTouchListener { v, event ->
+            if (event.action == android.view.MotionEvent.ACTION_DOWN) {
+                lastTouchX = event.x
+                lastTouchY = event.y
+                // Store in view tags for retrieval in controller
+                v.setTag(R.id.tag_click_x, lastTouchX)
+                v.setTag(R.id.tag_click_y, lastTouchY)
+            }
+            false // Don't consume event, let click handlers process
+        }
+        
         binding.playLayout.setOnClickListener { playButtonClicked() }
         binding.playLayout.setOnLongClickListener { itemView.performLongClick() }
         if (compact) {
@@ -59,12 +79,20 @@ class LibraryGridHolder(
 
     /**
      * Method called from [LibraryCategoryAdapter.onBindViewHolder]. It updates the data for this
-     * holder with the given manga.
+     * holder with the given item (manga or novel).
      *
-     * @param item the manga item to bind.
+     * @param item the library item to bind.
      */
     override fun onSetValues(item: LibraryItem) {
-        if (item !is LibraryMangaItem) throw IllegalStateException("Only LibraryMangaItem can use grid holder")
+        // Support both manga and novels in grid layout
+        when (item) {
+            is LibraryMangaItem -> bindMangaItem(item)
+            is LibraryNovelItem -> bindNovelItem(item)
+            else -> throw IllegalStateException("Unsupported item type for grid holder: ${item::class.simpleName}")
+        }
+    }
+    
+    private fun bindMangaItem(item: LibraryMangaItem) {
         // Update the title and subtitle of the manga.
         setCards(adapter.showOutline, binding.card, binding.unreadDownloadBadge.root)
         binding.playButton.transitionName = "library chapter $bindingAdapterPosition transition"
@@ -104,7 +132,61 @@ class LibraryGridHolder(
         binding.coverThumbnail.dispose()
         setCover(item.manga.manga)
     }
+    
+    private fun bindNovelItem(item: LibraryNovelItem) {
+        // Update the title and subtitle of the novel
+        setCards(adapter.showOutline, binding.card, binding.unreadDownloadBadge.root)
+        binding.playButton.transitionName = "library chapter $bindingAdapterPosition transition"
+        binding.constraintLayout.isVisible = item.novel.id != 0L
+        binding.title.text = item.novel.title.highlightText(item.filter, color)
+        binding.behindTitle.text = item.novel.title
+        
+        // Use default background for novels (no dominant color yet)
+        binding.coverConstraint.backgroundColor = itemView.context.getResourceColor(R.attr.background)
+        binding.behindTitle.setTextColor(
+            itemView.context.getResourceColor(R.attr.colorOnBackground)
+        )
+        
+        // Show novel author
+        val author = item.novel.author?.trim() ?: ""
+        binding.subtitle.text = author.highlightText(item.filter, color)
+        binding.compactTitle.text = binding.title.text?.toString()?.highlightText(item.filter, color)
 
+        binding.title.post {
+            val hasAuthorInFilter = item.filter.isNotBlank() && author.contains(item.filter, true)
+            binding.subtitle.isVisible = (binding.title.lineCount <= 1 || hasAuthorInFilter) && author.isNotBlank()
+            binding.title.maxLines = if (hasAuthorInFilter) 1 else 2
+        }
+
+        setNovelUnreadBadge(binding.unreadDownloadBadge.badgeView, item)
+        setNovelReadingButton(item)
+        setSelected(adapter.isSelected(flexibleAdapterPosition))
+
+        // Update the cover - load novel poster with color extraction
+        binding.coverThumbnail.dispose()
+        binding.coverThumbnail.loadNovel(item.novel)
+    }
+    
+    private fun setNovelUnreadBadge(badge: LibraryBadge, item: LibraryNovelItem) {
+        val showTotal = item.header.category.sortingMode() == LibrarySort.TotalChapters
+        badge.setUnreadDownload(
+            when {
+                showTotal -> item.totalChapters.toInt()
+                else -> item.unreadCount.toInt()
+            },
+            -1, // Hide download count (green badge)
+            showTotal,
+            item.language,
+            true, // Always grid layout for novels when using grid holder
+        )
+    }
+    
+    private fun setNovelReadingButton(item: LibraryNovelItem) {
+        // Show "Continue Reading" button if there are unread chapters
+        itemView.findViewById<View>(R.id.play_layout)?.isVisible =
+            item.unreadCount > 0 && !item.hideReadingButton
+    }
+    
     override fun toggleActivation() {
         super.toggleActivation()
         setSelected(adapter.isSelected(flexibleAdapterPosition))
@@ -138,6 +220,17 @@ class LibraryGridHolder(
                 },
             )
         }
+    }
+
+    private fun setCoverUrl(coverUrl: String?) {
+        if ((adapter.recyclerView.context as? Activity)?.isDestroyed == true) return
+        val imageLoader = binding.coverThumbnail.context.imageLoader
+        val request = coil3.request.ImageRequest.Builder(binding.coverThumbnail.context)
+            .data(coverUrl)
+            .target(binding.coverThumbnail.asTarget())
+            .scale(Scale.FIT)
+            .build()
+        imageLoader.enqueue(request)
     }
 
     fun setFreeformCoverRatio(manga: Manga, parent: AutofitRecyclerView? = null) {

@@ -14,6 +14,7 @@ import eu.kanade.tachiyomi.data.preference.PreferenceKeys
 import eu.kanade.tachiyomi.data.preference.PreferencesHelper
 import eu.kanade.tachiyomi.ui.reader.settings.ReaderBackgroundColor
 import uy.kohesive.injekt.injectLazy
+import yokai.core.mode.ModeManager
 import android.graphics.Color as AColor
 
 object ThemeUtil {
@@ -46,7 +47,7 @@ object ThemeUtil {
 
     fun isPitchBlack(context: Context): Boolean {
         val preferences: PreferencesHelper by injectLazy()
-        return context.isInNightMode() && preferences.themeDarkAmoled().get()
+        return context.isInNightMode() && context.shouldUseAmoled(preferences)
     }
 
     fun readerBackgroundColor(theme: Int, default: Int = AColor.WHITE): Int {
@@ -77,7 +78,7 @@ fun AppCompatActivity.setThemeByPref(preferences: PreferencesHelper) {
 }
 
 fun AppCompatActivity.getThemeWithExtras(theme: Resources.Theme, preferences: PreferencesHelper, oldTheme: Resources.Theme?): Resources.Theme {
-    val useAmoled = isDarkMode(preferences) && preferences.themeDarkAmoled().get()
+    val useAmoled = isDarkMode(preferences) && shouldUseAmoled(preferences)
     if (oldTheme != null && useAmoled) {
         val array = oldTheme.obtainStyledAttributes(intArrayOf(R.attr.background))
         val bg = array.getColor(0, 0)
@@ -94,18 +95,36 @@ fun AppCompatActivity.getThemeWithExtras(theme: Resources.Theme, preferences: Pr
 fun Context.isDarkMode(preferences: PreferencesHelper) =
     applicationContext.isInNightMode() || preferences.nightMode().get() == AppCompatDelegate.MODE_NIGHT_YES
 
+/**
+ * Get the current theme based on preferences and content mode.
+ * In novel mode, uses novel theme preferences. In manga mode, uses manga theme preferences.
+ */
 fun Context.getPrefTheme(preferences: PreferencesHelper): Themes {
     // Using a try catch in case I start to remove themes
     return try {
-        (
-            if (isDarkMode(preferences) && preferences.nightMode().get() != AppCompatDelegate.MODE_NIGHT_NO) {
-                preferences.darkTheme()
-            } else {
-                preferences.lightTheme()
-            }
-            ).get()
+        val isNovelMode = ModeManager.isNovelMode()
+        val isDark = isDarkMode(preferences) && preferences.nightMode().get() != AppCompatDelegate.MODE_NIGHT_NO
+        
+        if (isNovelMode) {
+            if (isDark) preferences.novelDarkTheme().get() else preferences.novelLightTheme().get()
+        } else {
+            if (isDark) preferences.darkTheme().get() else preferences.lightTheme().get()
+        }
     } catch (e: Exception) {
         ThemeUtil.convertNewThemes(preferences.context)
         getPrefTheme(preferences)
+    }
+}
+
+/**
+ * Check if AMOLED mode should be used based on current content mode.
+ */
+fun Context.shouldUseAmoled(preferences: PreferencesHelper): Boolean {
+    val isNovelMode = ModeManager.isNovelMode()
+    
+    return if (isNovelMode) {
+        preferences.novelThemeDarkAmoled().get()
+    } else {
+        preferences.themeDarkAmoled().get()
     }
 }

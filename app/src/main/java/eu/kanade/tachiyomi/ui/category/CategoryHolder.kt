@@ -28,8 +28,14 @@ class CategoryHolder(view: View, val adapter: CategoryAdapter) : BaseFlexibleVie
 
     private val binding = CategoriesItemBinding.bind(view)
     init {
+        // Click on edit button opens the edit/create dialog
         binding.editButton.setOnClickListener {
-            submitChanges()
+            adapter.categoryItemListener.onCategoryEdit(flexibleAdapterPosition)
+        }
+        
+        // Click on the whole row also opens the edit/create dialog
+        itemView.setOnClickListener {
+            adapter.categoryItemListener.onCategoryEdit(flexibleAdapterPosition)
         }
     }
 
@@ -44,91 +50,37 @@ class CategoryHolder(view: View, val adapter: CategoryAdapter) : BaseFlexibleVie
     fun bind(category: Category) {
         // Set capitalized title.
         binding.title.text = category.name.replaceFirstChar { it.titlecase(Locale.getDefault()) }
-        binding.editText.setOnEditorActionListener { _, actionId, _ ->
-            if (actionId == EditorInfo.IME_ACTION_DONE) {
-                submitChanges()
-            }
-            true
-        }
+        
         createCategory = category.order == CREATE_CATEGORY_ORDER
         if (createCategory) {
             binding.title.setTextColor(ContextCompat.getColor(itemView.context, R.color.material_on_background_disabled))
             regularDrawable = ContextCompat.getDrawable(
                 itemView.context,
-                R.drawable
-                    .ic_add_24dp,
+                R.drawable.ic_add_24dp,
             )
             binding.image.isVisible = false
-            binding.editButton.setImageDrawable(null)
-            binding.editText.setText("")
-            binding.editText.hint = binding.title.text
+            binding.editButton.setImageDrawable(ContextCompat.getDrawable(itemView.context, R.drawable.ic_add_24dp))
+            binding.editButton.drawable?.mutate()?.setTint(
+                ContextCompat.getColor(itemView.context, R.color.gray_button)
+            )
+            binding.reorder.setOnTouchListener { _, _ -> true }
         } else {
             binding.title.setTextColor(itemView.context.getResourceColor(R.attr.colorOnBackground))
             regularDrawable = ContextCompat.getDrawable(
                 itemView.context,
-                R.drawable
-                    .ic_drag_handle_24dp,
+                R.drawable.ic_drag_handle_24dp,
             )
             binding.image.isVisible = true
-            binding.editText.setText(binding.title.text)
-        }
-    }
-
-    @SuppressLint("ClickableViewAccessibility")
-    fun isEditing(editing: Boolean) {
-        itemView.isActivated = editing
-        binding.title.visibility = if (editing) View.INVISIBLE else View.VISIBLE
-        binding.editText.visibility = if (!editing) View.INVISIBLE else View.VISIBLE
-        if (editing) {
-            binding.editText.requestFocus()
-            binding.editText.selectAll()
-            binding.editButton.setImageDrawable(ContextCompat.getDrawable(itemView.context, R.drawable.ic_check_24dp))
-            binding.editButton.drawable.mutate().setTint(itemView.context.getResourceColor(R.attr.colorSecondary))
-            showKeyboard()
-            if (!createCategory) {
-                binding.reorder.setImageDrawable(
-                    ContextCompat.getDrawable(
-                        itemView.context,
-                        R.drawable.ic_delete_24dp,
-                    ),
-                )
-                binding.reorder.setOnClickListener {
-                    adapter.categoryItemListener.onItemDelete(flexibleAdapterPosition)
-                }
-            }
-        } else {
-            if (!createCategory) {
-                setDragHandleView(binding.reorder)
-                binding.editButton.setImageDrawable(ContextCompat.getDrawable(itemView.context, R.drawable.ic_edit_24dp))
-            } else {
-                binding.editButton.setImageDrawable(null)
-                binding.reorder.setOnTouchListener { _, _ -> true }
-            }
-            binding.editText.clearFocus()
+            binding.editButton.setImageDrawable(ContextCompat.getDrawable(itemView.context, R.drawable.ic_edit_24dp))
             binding.editButton.drawable?.mutate()?.setTint(
-                ContextCompat.getColor(
-                    itemView.context,
-                    R
-                        .color.gray_button,
-                ),
+                ContextCompat.getColor(itemView.context, R.color.gray_button)
             )
-            binding.reorder.setImageDrawable(regularDrawable)
+            setDragHandleView(binding.reorder)
         }
-    }
-
-    private fun submitChanges() {
-        if (binding.editText.visibility == View.VISIBLE) {
-            if (adapter.categoryItemListener
-                .onCategoryRename(flexibleAdapterPosition, binding.editText.text.toString())
-            ) {
-                isEditing(false)
-                if (!createCategory) {
-                    binding.title.text = binding.editText.text.toString()
-                }
-            }
-        } else {
-            itemView.performClick()
-        }
+        binding.reorder.setImageDrawable(regularDrawable)
+        
+        // Hide inline edit text - we use dialog now
+        binding.editText.visibility = View.GONE
     }
 
     private fun showKeyboard() {

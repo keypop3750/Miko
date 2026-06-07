@@ -86,6 +86,8 @@ class TriStateCheckBox constructor(context: Context, attrs: AttributeSet?) :
     private val disabledColor = ColorStateList.valueOf(
         ColorUtils.setAlphaComponent(context.getResourceColor(R.attr.colorControlNormal), (disabledAlpha * 255).roundToInt()),
     )
+    
+    private var customAccentColor: ColorStateList? = null
 
     init {
         addView(binding.root)
@@ -186,7 +188,7 @@ class TriStateCheckBox constructor(context: Context, attrs: AttributeSet?) :
                 }
                 State.CHECKED -> {
                     setAnimVectorCompat(R.drawable.anim_check_box_blank_to_checked_24dp)
-                    backgroundTintList = checkedColor
+                    backgroundTintList = customAccentColor ?: checkedColor
                 }
                 State.IGNORE -> {
                     setAnimVectorCompat(
@@ -196,7 +198,7 @@ class TriStateCheckBox constructor(context: Context, attrs: AttributeSet?) :
                             else -> R.drawable.anim_checkbox_blank_to_x_24dp
                         },
                     )
-                    backgroundTintList = ignoreColor
+                    backgroundTintList = customAccentColor ?: ignoreColor
                 }
             }
             if (this@TriStateCheckBox.isEnabled) imageTintList = backgroundTintList
@@ -205,6 +207,15 @@ class TriStateCheckBox constructor(context: Context, attrs: AttributeSet?) :
 
     fun setCheckboxBackground(drawable: Drawable?) {
         binding.triStateBox.background = drawable
+    }
+    
+    /**
+     * Set a custom accent color for the checkbox.
+     * This overrides the default theme colors.
+     */
+    fun setAccentColor(color: Int) {
+        customAccentColor = ColorStateList.valueOf(color)
+        updateDrawable()
     }
 
     private fun updateDrawable() {
@@ -216,7 +227,7 @@ class TriStateCheckBox constructor(context: Context, attrs: AttributeSet?) :
                 }
                 State.CHECKED -> {
                     setVectorCompat(R.drawable.ic_check_box_24dp)
-                    checkedColor
+                    customAccentColor ?: checkedColor
                 }
                 State.IGNORE -> {
                     setVectorCompat(
@@ -226,7 +237,7 @@ class TriStateCheckBox constructor(context: Context, attrs: AttributeSet?) :
                             R.drawable.ic_check_box_x_24dp
                         },
                     )
-                    ignoreColor
+                    customAccentColor ?: ignoreColor
                 }
             }
             if (this@TriStateCheckBox.isEnabled) imageTintList = backgroundTintList

@@ -1,7 +1,10 @@
 package eu.kanade.tachiyomi.source
 
 import android.content.Context
+import co.touchlab.kermit.Logger
 import eu.kanade.tachiyomi.extension.ExtensionManager
+import eu.kanade.tachiyomi.extension.novel.NovelExtensionManager
+import eu.kanade.tachiyomi.network.NetworkHelper
 import eu.kanade.tachiyomi.source.model.Page
 import eu.kanade.tachiyomi.source.model.SChapter
 import eu.kanade.tachiyomi.source.model.SManga
@@ -13,16 +16,19 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import yokai.i18n.MR
 import yokai.util.lang.getString
+import eu.kanade.tachiyomi.source.novel.NovelSourceWrapper
 
 class SourceManager(
     private val context: Context,
     private val extensionManager: ExtensionManager,
+    private val novelExtensionManager: NovelExtensionManager,
+    private val networkHelper: NetworkHelper,
 ) {
 
     private val scope = CoroutineScope(Job() + Dispatchers.IO)
@@ -38,30 +44,36 @@ class SourceManager(
     private val delegatedSources = emptyList<DelegatedSource>().associateBy { it.sourceId }
 
     init {
+        // Combine both manga and novel extension flows to rebuild sources map
+        // whenever either changes
         scope.launch {
-            extensionManager.installedExtensionsFlow
-                .collectLatest { extensions ->
-                    val mutableMap = ConcurrentHashMap<Long, Source>(mapOf(LocalSource.ID to LocalSource(context)))
-                    extensions.forEach { extension ->
-                        extension.sources.forEach {
-                            mutableMap[it.id] = it
-                            //delegatedSources[it.id]?.delegatedHttpSource?.delegate = it as? HttpSource
-                            //registerStubSource(it)
-                        }
+            combine(
+                extensionManager.installedExtensionsFlow,
+                novelExtensionManager.installedExtensionsFlow,
+            ) { mangaExtensions, novelExtensions ->
+                Pair(mangaExtensions, novelExtensions)
+            }.collect { (mangaExtensions, novelExtensions) ->
+                val mutableMap = ConcurrentHashMap<Long, Source>(mapOf(LocalSource.ID to LocalSource(context)))
+                
+                // Add manga sources from extensions
+                mangaExtensions.forEach { extension ->
+                    extension.sources.forEach {
+                        mutableMap[it.id] = it
                     }
-                    sourcesMapFlow.value = mutableMap
                 }
+                
+                // Add novel sources from extensions (wrapped as CatalogueSource)
+                novelExtensions.forEach { extension ->
+                    extension.sources.forEach { novelSource ->
+                        Logger.d { "[SOURCE_MGR] Adding novel source: ${novelSource.name} (id=${novelSource.id})" }
+                        mutableMap[novelSource.id] = NovelSourceWrapper(novelSource)
+                    }
+                }
+                
+                Logger.d { "[SOURCE_MGR] Sources map rebuilt: ${mutableMap.size} sources (manga=${mangaExtensions.sumOf { it.sources.size }}, novel=${novelExtensions.sumOf { it.sources.size }})" }
+                sourcesMapFlow.value = mutableMap
+            }
         }
-
-//        scope.launch {
-//            sourceRepository.subscribeAll()
-//                .collectLatest { sources ->
-//                    val mutableMap = stubSourcesMap.toMutableMap()
-//                    sources.forEach {
-//                        mutableMap[it.id] = StubSource(it)
-//                    }
-//                }
-//        }
     }
 
     fun get(sourceKey: Long): Source? {

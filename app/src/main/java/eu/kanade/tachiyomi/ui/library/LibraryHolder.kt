@@ -74,18 +74,28 @@ abstract class LibraryHolder(
     }
 
     override fun onLongClick(view: View?): Boolean {
+        val item = adapter.getItem(flexibleAdapterPosition)
         return if (adapter.isLongPressDragEnabled) {
-            val manga = (adapter.getItem(flexibleAdapterPosition) as? LibraryMangaItem)?.manga
-            if (manga != null && !isDraggable) {
-                adapter.mItemLongClickListener.onItemLongClick(flexibleAdapterPosition)
+            // Drag mode is enabled - check if this specific item is draggable
+            if (!isDraggable && (item is LibraryMangaItem || item is LibraryNovelItem)) {
+                // Item is not draggable (e.g., novels in non-DnD sort), trigger selection
+                adapter.mItemLongClickListener?.onItemLongClick(flexibleAdapterPosition)
                 toggleActivation()
                 true
             } else {
+                // Item is draggable, let FlexibleAdapter handle drag
                 super.onLongClick(view)
                 false
             }
         } else {
-            super.onLongClick(view)
+            // Drag mode is disabled - long-press should trigger selection for both manga and novels
+            if (item is LibraryMangaItem || item is LibraryNovelItem) {
+                adapter.mItemLongClickListener?.onItemLongClick(flexibleAdapterPosition)
+                toggleActivation()
+                true
+            } else {
+                super.onLongClick(view)
+            }
         }
     }
 }

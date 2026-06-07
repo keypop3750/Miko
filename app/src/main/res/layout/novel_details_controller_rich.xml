@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.coordinatorlayout.widget.CoordinatorLayout 
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/novel_frame_layout"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="?attr/background">
+
+    <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+        android:id="@+id/swipe_refresh"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="?attr/background">
+
+        <!-- RecyclerView with header as first item (manga pattern) -->
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/recycler"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:clipToPadding="false"
+            tools:listitem="@layout/novel_chapter_item" />
+
+    </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
+
+    <!-- Fast scroller for quick navigation -->
+    <eu.kanade.tachiyomi.ui.base.MaterialFastScroll
+        android:id="@+id/fast_scroller"
+        android:layout_width="wrap_content"
+        android:layout_height="match_parent"
+        android:layout_gravity="end"
+        android:layout_marginTop="4dp"
+        android:layout_marginBottom="4dp" />
+
+    <!-- Touch overlay for dismissing dialogs/sheets -->
+    <View
+        android:id="@+id/touch_view"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:clickable="false"
+        android:visibility="gone" />
+
+    <!-- Full cover view for expand animation -->
+    <com.google.android.material.imageview.ShapeableImageView
+        android:id="@+id/novel_cover_full"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:clickable="true"
+        android:focusable="true"
+        android:scaleType="fitCenter"
+        android:visibility="gone" />
+
+</androidx.coordinatorlayout.widget.CoordinatorLayout>

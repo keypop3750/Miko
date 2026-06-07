@@ -1,0 +1,228 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Swipe Card Layout for Swipes Feature
+    
+    Enhanced card design with parallax scrolling:
+    - Parallax cover image that moves slower than content
+    - Fixed-height scrollable info section
+    - Title and metadata overlay
+    - Swipe direction overlays (red left, green right)
+    - Smooth scrolling experience
+-->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:layout_margin="8dp">
+
+    <com.google.android.material.card.MaterialCardView
+        android:id="@+id/card_view"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        app:cardCornerRadius="16dp"
+        app:cardElevation="8dp"
+        app:strokeWidth="0dp">
+
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="?attr/colorSurface">
+
+            <!-- FIXED Background Layer (Cover Image - stays in place) -->
+            <ImageView
+                android:id="@+id/manga_cover"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:scaleType="centerCrop"
+                android:contentDescription="Manga cover"
+                tools:ignore="HardcodedText"
+                tools:src="@mipmap/ic_launcher" />
+
+            <!-- Dark overlay that gets darker on scroll -->
+            <View
+                android:id="@+id/dark_overlay"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:background="#00000000"
+                android:alpha="0.0" />
+
+            <!-- Gradient overlay (shorter, only covers bottom portion past title) -->
+            <View
+                android:id="@+id/gradient_overlay"
+                android:layout_width="match_parent"
+                android:layout_height="600dp"
+                android:layout_gravity="bottom"
+                android:background="@drawable/gradient_shape"
+                android:alpha="0.6" />
+
+            <!-- Scrollable Content Layer (transparent background) -->
+            <androidx.core.widget.NestedScrollView
+                android:id="@+id/scroll_view"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:fillViewport="true"
+                android:scrollbars="none"
+                android:overScrollMode="never"
+                android:requiresFadingEdge="vertical"
+                android:fadingEdgeLength="60dp"
+                android:background="@android:color/transparent">
+
+                <androidx.constraintlayout.widget.ConstraintLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content">
+
+                    <!-- Spacer to position content (not too low, not too high) -->
+                    <Space
+                        android:id="@+id/top_spacer"
+                        android:layout_width="0dp"
+                        android:layout_height="400dp"
+                        app:layout_constraintTop_toTopOf="parent"
+                        app:layout_constraintStart_toStartOf="parent"
+                        app:layout_constraintEnd_toEndOf="parent" />
+
+                    <!-- Content Information Area (Fixed height with internal scroll) -->
+                    <LinearLayout
+                        android:id="@+id/content_info"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="16dp"
+                        android:layout_marginEnd="16dp"
+                        android:layout_marginTop="16dp"
+                        android:layout_marginBottom="24dp"
+                        android:orientation="vertical"
+                        android:paddingBottom="40dp"
+                        app:layout_constraintTop_toBottomOf="@id/top_spacer"
+                        app:layout_constraintStart_toStartOf="parent"
+                        app:layout_constraintEnd_toEndOf="parent"
+                        app:layout_constraintBottom_toBottomOf="parent">
+
+                        <!-- Title -->
+                        <com.google.android.material.textview.MaterialTextView
+                            android:id="@+id/manga_title"
+                            style="?textAppearanceHeadlineSmall"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:textColor="@android:color/white"
+                            android:textStyle="bold"
+                            android:shadowColor="@android:color/black"
+                            android:shadowDx="1"
+                            android:shadowDy="1"
+                            android:shadowRadius="3"
+                            tools:text="Sample Manga Title That Can Be Long" />
+
+                        <!-- Author and Status -->
+                        <com.google.android.material.textview.MaterialTextView
+                            android:id="@+id/manga_author"
+                            style="?textAppearanceBodyMedium"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="6dp"
+                            android:textColor="@android:color/white"
+                            android:shadowColor="@android:color/black"
+                            android:shadowDx="1"
+                            android:shadowDy="1"
+                            android:shadowRadius="2"
+                            tools:text="Author Name • Ongoing" />
+
+                        <!-- Tags/Genres -->
+                        <com.google.android.material.textview.MaterialTextView
+                            android:id="@+id/manga_tags"
+                            style="?textAppearanceBodySmall"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="8dp"
+                            android:textColor="@android:color/white"
+                            android:shadowColor="@android:color/black"
+                            android:shadowDx="1"
+                            android:shadowDy="1"
+                            android:shadowRadius="2"
+                            android:alpha="0.85"
+                            tools:text="Action, Adventure, Fantasy, Shounen" />
+
+                        <!-- Divider -->
+                        <View
+                            android:layout_width="match_parent"
+                            android:layout_height="1dp"
+                            android:layout_marginTop="12dp"
+                            android:layout_marginBottom="12dp"
+                            android:background="@android:color/white"
+                            android:alpha="0.3" />
+
+                        <!-- Description -->
+                        <com.google.android.material.textview.MaterialTextView
+                            android:id="@+id/manga_description"
+                            style="?textAppearanceBodyMedium"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:textColor="@android:color/white"
+                            android:shadowColor="@android:color/black"
+                            android:shadowDx="1"
+                            android:shadowDy="1"
+                            android:shadowRadius="2"
+                            android:alpha="0.9"
+                            android:lineSpacingExtra="4dp"
+                            tools:text="This is a sample description that can be quite long. Users can scroll the entire card to read the full description. The parallax effect makes the cover image move slower than the text, creating a nice visual effect. The description provides information about the manga's plot, themes, and other relevant details that might help users decide if they want to add it to their library." />
+
+                        <!-- Scroll hint (subtle indicator to scroll for more) -->
+                        <com.google.android.material.textview.MaterialTextView
+                            android:id="@+id/scroll_hint"
+                            style="?textAppearanceBodySmall"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="16dp"
+                            android:gravity="center"
+                            android:text="↓ Scroll for more ↓"
+                            android:textColor="@android:color/white"
+                            android:alpha="0.5"
+                            android:visibility="gone" />
+
+                    </LinearLayout>
+
+                </androidx.constraintlayout.widget.ConstraintLayout>
+
+            </androidx.core.widget.NestedScrollView>
+
+            <!-- Metadata Enhancement Debug Badge (Phase 1 - Testing Only) -->
+            <com.google.android.material.textview.MaterialTextView
+                android:id="@+id/metadata_badge"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="top|end"
+                android:layout_marginTop="12dp"
+                android:layout_marginEnd="12dp"
+                android:paddingStart="10dp"
+                android:paddingEnd="10dp"
+                android:paddingTop="4dp"
+                android:paddingBottom="4dp"
+                android:background="@drawable/metadata_badge_background"
+                android:textColor="@android:color/white"
+                android:textSize="11sp"
+                android:textStyle="bold"
+                android:elevation="4dp"
+                android:alpha="0.9"
+                android:visibility="gone"
+                tools:text="AniList"
+                tools:visibility="visible" />
+
+            <!-- Left Swipe Overlay (Skip/Blacklist - Red) -->
+            <View
+                android:id="@+id/left_overlay"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:background="#80FF0000"
+                android:visibility="gone" />
+
+            <!-- Right Swipe Overlay (Add to Library - Green) -->
+            <View
+                android:id="@+id/right_overlay"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:background="#8000FF00"
+                android:visibility="gone" />
+
+        </FrameLayout>
+
+    </com.google.android.material.card.MaterialCardView>
+
+</FrameLayout>

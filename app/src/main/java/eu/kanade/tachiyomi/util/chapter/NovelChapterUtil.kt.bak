@@ -1,0 +1,99 @@
+package eu.kanade.tachiyomi.util.chapter
+
+import android.content.Context
+import androidx.core.graphics.ColorUtils
+import eu.kanade.tachiyomi.R
+import yokai.domain.novelchapter.models.NovelChapter
+import eu.kanade.tachiyomi.ui.novel.chapter.ChapterItem
+import eu.kanade.tachiyomi.util.system.contextCompatColor
+import eu.kanade.tachiyomi.util.system.getResourceColor
+
+/**
+ * Utility functions for novel chapters.
+ * Mirrors ChapterUtil.kt for consistency.
+ */
+object NovelChapterUtil {
+
+    private val volumeRegex = Regex("""(vol|volume)\.? *([0-9]+)?""", RegexOption.IGNORE_CASE)
+    private val seasonRegex = Regex("""(Season |S)([0-9]+)?""")
+
+    /**
+     * Get group number (volume or season) from chapter item.
+     * Works with ChapterItem (UI model) that delegates to Chapter.
+     */
+    fun getGroupNumber(chapter: ChapterItem): Int? {
+        // ChapterItem delegates to Chapter which has 'name' property
+        val groups = volumeRegex.find(chapter.name)?.groups
+        if (groups != null) return groups[2]?.value?.toIntOrNull()
+        val seasonGroups = seasonRegex.find(chapter.name)?.groups
+        if (seasonGroups != null) return seasonGroups[2]?.value?.toIntOrNull()
+        return null
+    }
+
+    /**
+     * Get group number from NovelChapter domain model.
+     */
+    fun getGroupNumber(chapter: NovelChapter): Int? {
+        val groups = volumeRegex.find(chapter.title)?.groups
+        if (groups != null) return groups[2]?.value?.toIntOrNull()
+        val seasonGroups = seasonRegex.find(chapter.title)?.groups
+        if (seasonGroups != null) return seasonGroups[2]?.value?.toIntOrNull()
+        return null
+    }
+
+    private fun getVolumeNumber(title: String): Int? {
+        val groups = volumeRegex.find(title)?.groups
+        if (groups != null) return groups[2]?.value?.toIntOrNull()
+        return null
+    }
+
+    private fun getSeasonNumber(title: String): Int? {
+        val groups = seasonRegex.find(title)?.groups
+        if (groups != null) return groups[2]?.value?.toIntOrNull()
+        return null
+    }
+
+    fun hasMultipleVolumes(chapters: List<ChapterItem>): Boolean {
+        val volumeSet = mutableSetOf<Int>()
+        chapters.forEach {
+            val volNum = getVolumeNumber(it.name)
+            if (volNum != null) {
+                volumeSet.add(volNum)
+                if (volumeSet.size >= 2) return true
+            }
+        }
+        return false
+    }
+
+    fun hasMultipleSeasons(chapters: List<ChapterItem>): Boolean {
+        val seasonSet = mutableSetOf<Int>()
+        chapters.forEach {
+            val seasonNum = getSeasonNumber(it.name)
+            if (seasonNum != null) {
+                seasonSet.add(seasonNum)
+                if (seasonSet.size >= 2) return true
+            }
+        }
+        return false
+    }
+
+    /**
+     * Color utilities for novel chapters.
+     */
+    fun readColor(context: Context): Int = context.contextCompatColor(R.color.read_chapter)
+
+    fun unreadColor(context: Context, secondary: Boolean = false): Int {
+        val color = context.getResourceColor(R.attr.colorOnSurface)
+        // 78% alpha for chapter details, 100% for chapter number/title
+        return ColorUtils.setAlphaComponent(color, if (secondary) 198 else 255)
+    }
+
+    fun bookmarkedColor(context: Context): Int = context.getResourceColor(R.attr.colorSecondary)
+
+    fun bookmarkColor(context: Context, chapter: ChapterItem): Int {
+        return when {
+            chapter.bookmark -> bookmarkedColor(context)
+            else -> readColor(context)
+        }
+    }
+}

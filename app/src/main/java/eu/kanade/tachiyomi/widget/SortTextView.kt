@@ -1,6 +1,7 @@
 package eu.kanade.tachiyomi.widget
 
 import android.content.Context
+import android.content.res.ColorStateList
 import android.util.AttributeSet
 import android.view.LayoutInflater
 import android.widget.FrameLayout
@@ -81,6 +82,15 @@ class SortTextView constructor(context: Context, attrs: AttributeSet?) :
      */
     fun setOnSortChangeListener(listener: OnSortChangeListener?) {
         mOnSortChangeListener = listener
+    }
+    
+    /**
+     * Set a custom accent color for the sort arrow.
+     */
+    fun setAccentColor(color: Int) {
+        if (isSorting) {
+            binding.sortImageView.imageTintList = ColorStateList.valueOf(color)
+        }
     }
 
     fun updateDrawable() {

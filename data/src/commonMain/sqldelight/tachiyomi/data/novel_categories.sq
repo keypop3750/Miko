@@ -1,0 +1,69 @@
+import kotlin.Boolean;
+
+-- Novel categories (separate from manga categories)
+CREATE TABLE novel_categories (
+    _id INTEGER PRIMARY KEY,
+    name TEXT NOT NULL UNIQUE,
+    sortOrder INTEGER NOT NULL,
+    flags INTEGER NOT NULL DEFAULT 0
+);
+
+-- Novel category assignments
+CREATE TABLE novels_categories (
+    novel_id INTEGER NOT NULL,
+    category_id INTEGER NOT NULL,
+    PRIMARY KEY(novel_id, category_id),
+    FOREIGN KEY(novel_id) REFERENCES novels(_id) ON DELETE CASCADE,
+    FOREIGN KEY(category_id) REFERENCES novel_categories(_id) ON DELETE CASCADE
+);
+
+-- Indexes
+CREATE INDEX novels_categories_novel_index ON novels_categories(novel_id);
+CREATE INDEX novels_categories_category_index ON novels_categories(category_id);
+
+-- Novel category queries
+findAllCategories:
+SELECT *
+FROM novel_categories
+ORDER BY sortOrder;
+
+getCategoriesForNovel:
+SELECT c.*
+FROM novel_categories c
+JOIN novels_categories a ON c._id = a.category_id
+WHERE a.novel_id = :novel_id
+ORDER BY c.sortOrder ASC;
+
+-- Insert novel category
+insert:
+INSERT INTO novel_categories (name, sortOrder, flags)
+VALUES (:name, :sortOrder, :flags);
+
+-- Get last inserted row id
+selectLastInsertedRowId:
+SELECT last_insert_rowid();
+
+-- Update novel category
+update:
+UPDATE novel_categories SET
+    name = coalesce(:name, name),
+    sortOrder = coalesce(:sortOrder, sortOrder),
+    flags = coalesce(:flags, flags)
+WHERE _id = :id;
+
+-- Delete novel category
+delete:
+DELETE FROM novel_categories WHERE _id = :id;
+
+-- Insert novel-category assignment
+insertNovelCategory:
+INSERT OR IGNORE INTO novels_categories (novel_id, category_id)
+VALUES (:novelId, :categoryId);
+
+-- Delete novel from category
+deleteNovelCategory:
+DELETE FROM novels_categories WHERE novel_id = :novelId AND category_id = :categoryId;
+
+-- Delete all category assignments for a novel
+deleteNovelCategories:
+DELETE FROM novels_categories WHERE novel_id = :novelId;

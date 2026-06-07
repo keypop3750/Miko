@@ -13,9 +13,11 @@ import coil3.size.SizeResolver
 import coil3.target.ImageViewTarget
 import eu.kanade.tachiyomi.data.coil.CoverViewTarget
 import eu.kanade.tachiyomi.data.coil.LibraryMangaImageTarget
+import eu.kanade.tachiyomi.data.coil.NovelCoverViewTarget
 import eu.kanade.tachiyomi.domain.manga.models.Manga
 import yokai.domain.manga.models.MangaCover
 import yokai.domain.manga.models.cover
+import yokai.domain.novel.Novel
 
 private const val MAX_BITMAP_SIZE = 2048
 
@@ -27,6 +29,22 @@ fun ImageView.loadManga(
     val request = ImageRequest.Builder(context)
         .data(manga.cover())
         .target(LibraryMangaImageTarget(this, manga))
+        .precision(Precision.INEXACT)
+        .size(SizeResolver.ORIGINAL)
+        .maxBitmapSize(Size(MAX_BITMAP_SIZE, MAX_BITMAP_SIZE))
+        .apply(builder)
+        .build()
+    return imageLoader.enqueue(request)
+}
+
+fun ImageView.loadNovel(
+    novel: Novel,
+    imageLoader: ImageLoader = context.imageLoader,
+    builder: ImageRequest.Builder.() -> Unit = {},
+): Disposable {
+    val request = ImageRequest.Builder(context)
+        .data(novel.posterUrl)
+        .target(NovelCoverViewTarget(this))
         .precision(Precision.INEXACT)
         .size(SizeResolver.ORIGINAL)
         .maxBitmapSize(Size(MAX_BITMAP_SIZE, MAX_BITMAP_SIZE))

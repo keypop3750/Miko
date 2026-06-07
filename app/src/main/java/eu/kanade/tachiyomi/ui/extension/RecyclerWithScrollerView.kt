@@ -5,15 +5,23 @@ import android.util.AttributeSet
 import android.widget.FrameLayout
 import androidx.core.view.updatePaddingRelative
 import androidx.recyclerview.widget.RecyclerView
+import com.google.android.material.bottomsheet.BottomSheetBehavior
 import eu.davidea.flexibleadapter.FlexibleAdapter
 import eu.davidea.flexibleadapter.items.IFlexible
 import eu.kanade.tachiyomi.databinding.RecyclerWithScrollerBinding
+
+/**
+ * Interface for extension bottom sheets that can work with RecyclerWithScrollerView
+ */
+interface ExtensionBottomSheetLike {
+    val sheetBehavior: BottomSheetBehavior<*>?
+}
 
 class RecyclerWithScrollerView @JvmOverloads constructor(context: Context, attrs: AttributeSet? = null) :
     FrameLayout(context, attrs) {
 
     var binding: RecyclerWithScrollerBinding? = null
-    fun setUp(sheet: ExtensionBottomSheet, binding: RecyclerWithScrollerBinding, height: Int) {
+    fun setUp(sheet: ExtensionBottomSheetLike, binding: RecyclerWithScrollerBinding, height: Int) {
         binding.recycler.layoutManager = androidx.recyclerview.widget.LinearLayoutManager(context)
         binding.recycler.setHasFixedSize(true)
         binding.recycler.addItemDecoration(ExtensionDividerItemDecoration(context))
@@ -34,6 +42,11 @@ class RecyclerWithScrollerView @JvmOverloads constructor(context: Context, attrs
         )
 
         this.binding = binding
+    }
+    
+    // Legacy overload for ExtensionBottomSheet 
+    fun setUp(sheet: ExtensionBottomSheet, binding: RecyclerWithScrollerBinding, height: Int) {
+        setUp(sheet as ExtensionBottomSheetLike, binding, height)
     }
 
     fun onBind(adapter: FlexibleAdapter<IFlexible<*>>) {

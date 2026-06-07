@@ -1,0 +1,111 @@
+-- Manga metadata cache for Swipes enhancement
+
+import kotlin.Boolean;
+
+CREATE TABLE manga_metadata_cache (
+    manga_url TEXT NOT NULL,
+    source_id INTEGER NOT NULL,
+    provider TEXT NOT NULL,
+    provider_id INTEGER NOT NULL,
+    matched_title TEXT NOT NULL,
+    confidence_score REAL NOT NULL,
+    total_chapters INTEGER,
+    genres TEXT,
+    tags TEXT,
+    authors TEXT,
+    artists TEXT,
+    start_date TEXT,
+    end_date TEXT,
+    cover_url_hq TEXT,
+    average_score REAL,
+    description TEXT,
+    publishing_status TEXT,
+    is_ongoing INTEGER AS Boolean NOT NULL DEFAULT 1,
+    cached_at INTEGER NOT NULL,
+    last_refreshed INTEGER NOT NULL,
+    PRIMARY KEY(manga_url, source_id)
+);
+
+CREATE INDEX idx_metadata_cache_provider ON manga_metadata_cache(provider, provider_id);
+CREATE INDEX idx_metadata_cache_refresh ON manga_metadata_cache(is_ongoing, last_refreshed);
+
+-- Get cached metadata for a manga
+getCached:
+SELECT *
+FROM manga_metadata_cache
+WHERE manga_url = :mangaUrl
+AND source_id = :sourceId;
+
+-- Insert or replace metadata
+insert:
+INSERT OR REPLACE INTO manga_metadata_cache(
+    manga_url,
+    source_id,
+    provider,
+    provider_id,
+    matched_title,
+    confidence_score,
+    total_chapters,
+    genres,
+    tags,
+    authors,
+    artists,
+    start_date,
+    end_date,
+    cover_url_hq,
+    average_score,
+    description,
+    publishing_status,
+    is_ongoing,
+    cached_at,
+    last_refreshed
+) VALUES (
+    :mangaUrl,
+    :sourceId,
+    :provider,
+    :providerId,
+    :matchedTitle,
+    :confidenceScore,
+    :totalChapters,
+    :genres,
+    :tags,
+    :authors,
+    :artists,
+    :startDate,
+    :endDate,
+    :coverUrlHq,
+    :averageScore,
+    :description,
+    :publishingStatus,
+    :isOngoing,
+    :cachedAt,
+    :lastRefreshed
+);
+
+-- Get stale ongoing manga that need refresh (>7 days old)
+getStaleOngoing:
+SELECT *
+FROM manga_metadata_cache
+WHERE is_ongoing = 1
+AND (last_refreshed < :cutoffTimestamp);
+
+-- Update last refreshed timestamp
+updateRefreshTime:
+UPDATE manga_metadata_cache
+SET last_refreshed = :timestamp
+WHERE manga_url = :mangaUrl
+AND source_id = :sourceId;
+
+-- Clear all cache (for testing)
+clearAll:
+DELETE FROM manga_metadata_cache;
+
+-- Get cache statistics
+getStats:
+SELECT 
+    provider,
+    COUNT(*),
+    AVG(confidence_score),
+    SUM(CASE WHEN is_ongoing = 1 THEN 1 ELSE 0 END)
+FROM manga_metadata_cache
+GROUP BY provider;

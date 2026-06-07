@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Skeleton item matching exact dimensions of source_global_search_controller_card_item -->
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/constraint_layout"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:orientation="vertical">
+
+    <!-- Skeleton card - exact same dimensions as actual item (112dp x 168dp with 6dp margins) -->
+    <View
+        android:id="@+id/skeleton_card"
+        android:layout_width="112dp"
+        android:layout_height="168dp"
+        android:layout_marginStart="6dp"
+        android:layout_marginTop="6dp"
+        android:layout_marginEnd="6dp"
+        android:layout_marginBottom="18dp"
+        android:background="@drawable/skeleton_card_background"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent" />
+
+</androidx.constraintlayout.widget.ConstraintLayout>

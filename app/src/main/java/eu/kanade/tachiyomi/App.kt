@@ -38,10 +38,13 @@ import com.hippo.unifile.UniFile
 import eu.kanade.tachiyomi.appwidget.TachiyomiWidgetManager
 import eu.kanade.tachiyomi.core.preference.Preference
 import eu.kanade.tachiyomi.core.preference.PreferenceStore
+import eu.kanade.tachiyomi.data.coil.BitmapDrawableKeyer
 import eu.kanade.tachiyomi.data.coil.BufferedSourceFetcher
 import eu.kanade.tachiyomi.data.coil.MangaCoverFetcher
 import eu.kanade.tachiyomi.data.coil.MangaCoverKeyer
 import eu.kanade.tachiyomi.data.coil.MangaKeyer
+import eu.kanade.tachiyomi.data.coil.NovelCoverFetcher
+import eu.kanade.tachiyomi.data.coil.NovelKeyer
 import eu.kanade.tachiyomi.data.coil.TachiyomiImageDecoder
 import eu.kanade.tachiyomi.data.notification.Notifications
 import eu.kanade.tachiyomi.data.preference.PreferencesHelper
@@ -52,6 +55,7 @@ import eu.kanade.tachiyomi.ui.recents.RecentsPresenter
 import eu.kanade.tachiyomi.ui.security.SecureActivityDelegate
 import eu.kanade.tachiyomi.ui.source.SourcePresenter
 import eu.kanade.tachiyomi.util.manga.MangaCoverMetadata
+import eu.kanade.tachiyomi.util.novel.NovelCoverMetadata
 import eu.kanade.tachiyomi.util.system.AuthenticatorUtil
 import eu.kanade.tachiyomi.util.system.GLUtil
 import eu.kanade.tachiyomi.util.system.ImageUtil
@@ -73,6 +77,7 @@ import yokai.core.RollingUniFileLogWriter
 import yokai.core.di.appModule
 import yokai.core.di.domainModule
 import yokai.core.di.initExpensiveComponents
+import yokai.core.di.novelModule
 import yokai.core.di.preferenceModule
 import yokai.core.migration.Migrator
 import yokai.core.migration.migrations.migrations
@@ -106,7 +111,7 @@ open class App : Application(), DefaultLifecycleObserver, SingletonImageLoader.F
         }
 
         startKoin {
-            modules(preferenceModule(this@App), appModule(this@App), domainModule())
+            modules(preferenceModule(this@App), appModule(this@App), domainModule(), novelModule)
         }
         initExpensiveComponents(this)
 
@@ -134,6 +139,7 @@ open class App : Application(), DefaultLifecycleObserver, SingletonImageLoader.F
         setupNotificationChannels()
 
         MangaCoverMetadata.load()
+        NovelCoverMetadata.load()
         preferences.nightMode().changes()
             .onEach { AppCompatDelegate.setDefaultNightMode(it) }
             .launchIn(scope)
@@ -148,6 +154,11 @@ open class App : Application(), DefaultLifecycleObserver, SingletonImageLoader.F
         scope.launchIO {
             with(TachiyomiWidgetManager()) { this@App.init() }
         }
+
+        // Initialize ModeManager persistence for proper mode state management
+        yokai.core.mode.ModeManager.initializePersistence(
+            yokai.core.mode.PreferenceModeStatePersistence(preferences)
+        )
 
         // Show notification to disable Incognito Mode when it's enabled
         preferences.incognitoMode().changes()
@@ -271,13 +282,18 @@ open class App : Application(), DefaultLifecycleObserver, SingletonImageLoader.F
                 add(BufferedSourceFetcher.Factory())
                 add(MangaCoverFetcher.MangaFactory(callFactoryLazy))
                 add(MangaCoverFetcher.MangaCoverFactory(callFactoryLazy))
+                add(NovelCoverFetcher.NovelFactory(callFactoryLazy))
                 // Keyer
                 add(MangaKeyer())
                 add(MangaCoverKeyer())
+                add(NovelKeyer())
+                add(BitmapDrawableKeyer()) // CRITICAL FIX: Enable memory caching for extension/source icons
             }
             crossfade(true)
             allowRgb565(this@App.getSystemService<ActivityManager>()!!.isLowRamDevice)
-            allowHardware(true)
+            // CRITICAL FIX: Disable hardware bitmaps to prevent "Software rendering doesn't support hardware bitmaps"
+            // crash when capturing snapshots (View.draw() requires software bitmaps for Canvas operations)
+            allowHardware(false)
             if (networkPreferences.verboseLogging().get()) {
                 logger(DebugLogger())
             }

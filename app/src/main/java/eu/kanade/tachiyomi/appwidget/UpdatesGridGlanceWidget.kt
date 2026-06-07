@@ -45,6 +45,7 @@ import kotlinx.coroutines.MainScope
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
 import uy.kohesive.injekt.injectLazy
+import yokai.core.content.ContentType
 import yokai.domain.manga.models.cover
 import yokai.domain.recents.interactor.GetRecents
 
@@ -75,7 +76,8 @@ class UpdatesGridGlanceWidget : GlanceAppWidget() {
                 limit = when {
                     customAmount > 0 -> (customAmount * 1.5).roundToLong()
                     else -> 25L
-                }
+                },
+                contentType = ContentType.MANGA // Widget shows manga updates by default
             )
             .mapNotNull {
                 when {

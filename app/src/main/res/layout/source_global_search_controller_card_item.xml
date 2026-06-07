@@ -26,24 +26,11 @@
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:scaleType="centerCrop"
-            android:background="?attr/background"
-            tools:background="?attr/background"
+            android:background="?attr/colorSurfaceContainerHighest"
             tools:ignore="ContentDescription"
             tools:src="@mipmap/ic_launcher" />
 
-        <com.google.android.material.progressindicator.CircularProgressIndicator
-            android:id="@+id/progress"
-            android:indeterminate="true"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="center"
-            android:visibility="gone"
-            app:indicatorSize="16dp"
-            app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toTopOf="parent"
-            app:trackThickness="3dp" />
+        <!-- No loading indicator - skeleton handles loading state -->
 
     </com.google.android.material.card.MaterialCardView>
 
@@ -79,6 +66,7 @@
         style="?textAppearanceBodyMedium"
         android:layout_width="110dp"
         android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
         android:ellipsize="end"
         android:maxLines="1"
         android:textColor="?attr/colorOnBackground"

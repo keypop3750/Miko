@@ -25,6 +25,7 @@ class BrowseSourceItem(
     private val catalogueAsList: Preference<Boolean>,
     private val catalogueListType: Preference<Int>,
     private val outlineOnCovers: Preference<Boolean>,
+    private val isNovelSource: Boolean = false,
 ) :
     AbstractFlexibleItem<BrowseSourceHolder>() {
 
@@ -62,7 +63,13 @@ class BrowseSourceItem(
                 binding.coverThumbnail.maxHeight = Int.MAX_VALUE
                 binding.coverThumbnail.minimumHeight = 0
                 binding.constraintLayout.minHeight = 0
-                binding.coverThumbnail.scaleType = ImageView.ScaleType.CENTER_CROP
+                // Use FIT_CENTER for novels to show full cover without cropping
+                // Use CENTER_CROP for manga for better visual fill
+                binding.coverThumbnail.scaleType = if (isNovelSource) {
+                    ImageView.ScaleType.FIT_CENTER
+                } else {
+                    ImageView.ScaleType.CENTER_CROP
+                }
                 binding.coverThumbnail.adjustViewBounds = false
                 binding.coverThumbnail.updateLayoutParams<ConstraintLayout.LayoutParams> {
                     height = ConstraintLayout.LayoutParams.MATCH_CONSTRAINT
@@ -91,6 +98,10 @@ class BrowseSourceItem(
         position: Int,
         payloads: MutableList<Any?>?,
     ) {
+        // Set novel source flag for proper cover scaling before loading image
+        if (holder is BrowseSourceGridHolder) {
+            holder.setIsNovelSource(isNovelSource)
+        }
         holder.onSetValues(manga)
     }
 

@@ -178,7 +178,9 @@ class LibraryHeaderHolder(val view: View, val adapter: LibraryCategoryAdapter) :
         val isFilteredList = (adapter.libraryListener as? FilteredLibraryController)?.let {
             it.filterCategories.size == 1 && it.getTitle() == category.name
         } ?: false
-        val categoryName = if ((category.isAlone || isFilteredList) && !category.isDynamic) {
+        
+        // Always show category name - only hide if it's a filtered single-category view
+        val categoryName = if (isFilteredList && !category.isDynamic) {
             ""
         } else {
             category.name
@@ -277,12 +279,14 @@ class LibraryHeaderHolder(val view: View, val adapter: LibraryCategoryAdapter) :
         adapter.controller?.activity?.let { activity ->
             val items = LibrarySort.entries.map { it.menuSheetItem(cat.isDynamic) }
             val sortingMode = cat.sortingMode() ?: if (!cat.isDynamic) LibrarySort.DragAndDrop else null
+            android.util.Log.d("LibraryHeaderHolder", "showCatSortOptions: cat.id=${cat.id}, cat.mangaSort=${cat.mangaSort}, sortingMode=$sortingMode")
             val sheet = MaterialMenuSheet(
                 activity,
                 items,
                 activity.getString(MR.strings.sort_by),
                 sortingMode?.mainValue,
             ) { sheet, item ->
+                android.util.Log.d("LibraryHeaderHolder", "Sheet item clicked: item=$item, LibrarySort.valueOf(item)=${LibrarySort.valueOf(item)}")
                 onCatSortClicked(cat, item)
                 val nCategory = (adapter.getItem(flexibleAdapterPosition) as? LibraryHeaderItem)?.category
                 sheet.updateSortIcon(nCategory, LibrarySort.valueOf(item))
@@ -329,8 +333,10 @@ class LibraryHeaderHolder(val view: View, val adapter: LibraryCategoryAdapter) :
     }
 
     private fun onCatSortClicked(category: Category, menuId: Int?) {
+        android.util.Log.d("LibraryHeaderHolder", "onCatSortClicked: category.id=${category.id}, menuId=$menuId")
         val (mode, modType) = if (menuId == null) {
             val sortingMode = category.sortingMode() ?: LibrarySort.Title
+            android.util.Log.d("LibraryHeaderHolder", "onCatSortClicked: menuId=null, sortingMode=$sortingMode, isAscending=${category.isAscending()}")
             sortingMode to
                 if (sortingMode != LibrarySort.Random && category.isAscending()) {
                     sortingMode.categoryValueDescending
@@ -339,12 +345,16 @@ class LibraryHeaderHolder(val view: View, val adapter: LibraryCategoryAdapter) :
                 }
         } else {
             val sortingMode = LibrarySort.valueOf(menuId) ?: LibrarySort.Title
+            android.util.Log.d("LibraryHeaderHolder", "onCatSortClicked: menuId=$menuId, sortingMode=$sortingMode, category.sortingMode()=${category.sortingMode()}")
             if (sortingMode != LibrarySort.DragAndDrop && sortingMode == category.sortingMode()) {
+                android.util.Log.d("LibraryHeaderHolder", "onCatSortClicked: Same sort - toggling direction")
                 onCatSortClicked(category, null)
                 return
             }
+            android.util.Log.d("LibraryHeaderHolder", "onCatSortClicked: sortingMode.categoryValue='${sortingMode.categoryValue}'")
             sortingMode to sortingMode.categoryValue
         }
+        android.util.Log.d("LibraryHeaderHolder", "onCatSortClicked: FINAL mode=$mode, modType='$modType'")
         if (mode == LibrarySort.Random) {
             libraryPreferences.randomSortSeed().set(Random.nextInt())
         }

@@ -18,6 +18,15 @@
     <color name="tachiyomi_onSurface">#1B1B1E</color>
     <color name="tachiyomi_surfaceVariant">#E1E2EC</color>
     <color name="tachiyomi_onSurfaceVariant">#44464E</color>
+    
+    <!-- Novel reader colors -->
+    <color name="novel_text_highlight">#FFE082</color>
+    <color name="novel_progress_background">#80000000</color>
+    <color name="novel_progress_foreground">#FF5722</color>
+    
+    <!-- Skeleton placeholder colors -->
+    <color name="skeleton_placeholder">#1A808080</color> <!-- 10% grey opacity -->
+    
     <color name="tachiyomi_outline">#757780</color>
     <color name="tachiyomi_inverseOnSurface">#F2F0F4</color>
     <color name="tachiyomi_inverseSurface">#303033</color>
@@ -200,4 +209,7 @@
     <color name="tabBarIconColorDoki">@color/secondaryDoki</color>
     <color name="rippleColorDoki">#1FEABD62</color>
     <color name="backgroundDoki">#040716</color>
+    
+    <!-- Novel Reader Colors -->
+    <color name="colorAccent">@color/tachiyomi_primary</color>
 </resources>

@@ -14,6 +14,7 @@ import eu.kanade.tachiyomi.data.database.models.hideChapterTitle
 import eu.kanade.tachiyomi.data.preference.PreferencesHelper
 import eu.kanade.tachiyomi.domain.manga.models.Manga
 import eu.kanade.tachiyomi.ui.manga.chapter.ChapterItem
+import eu.kanade.tachiyomi.util.hideChapterTitle
 import eu.kanade.tachiyomi.util.system.contextCompatColor
 import eu.kanade.tachiyomi.util.system.dpToPx
 import eu.kanade.tachiyomi.util.system.dpToPxEnd
@@ -192,6 +193,23 @@ class ChapterUtil {
             val preferences: PreferencesHelper = Injekt.get()
             val context = LocalContext.current
             return preferredChapterName(context, manga, preferences)
+        }
+
+        // Novel overloads for preferredChapterName
+        fun Chapter.preferredChapterName(context: Context, novel: yokai.domain.novel.Novel, preferences: PreferencesHelper): String {
+            return if (novel.hideChapterTitle(preferences) && isRecognizedNumber) {
+                val number = decimalFormat.format(chapter_number.toDouble())
+                context.getString(MR.strings.chapter_, number)
+            } else {
+                name
+            }
+        }
+
+        @Composable
+        fun Chapter.preferredChapterName(novel: yokai.domain.novel.Novel): String {
+            val preferences: PreferencesHelper = Injekt.get()
+            val context = LocalContext.current
+            return preferredChapterName(context, novel, preferences)
         }
     }
 }

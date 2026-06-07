@@ -41,6 +41,18 @@ class ChapterItem(chapter: Chapter, val manga: Manga) :
         position: Int,
         payloads: MutableList<Any?>?,
     ) {
+        // Check if this is a partial update (payload present)
+        if (payloads != null && payloads.isNotEmpty()) {
+            // Payload update - only refresh download status to avoid flickering
+            val payload = payloads.firstOrNull()
+            if (payload is ChapterItem) {
+                // Update only the download button, not entire ViewHolder
+                holder.notifyStatus(payload.status, payload.isLocked, payload.progress)
+                return
+            }
+        }
+        
+        // Full bind - this is the initial bind or a structural change
         holder.bind(this, manga)
     }
 
@@ -50,6 +62,6 @@ class ChapterItem(chapter: Chapter, val manga: Manga) :
         position: Int,
     ) {
         super.unbindViewHolder(adapter, holder, position)
-        (adapter as MangaDetailsAdapter).controller.dismissPopup(position)
+        (adapter as MangaDetailsAdapter).controller?.dismissPopup(position)
     }
 }

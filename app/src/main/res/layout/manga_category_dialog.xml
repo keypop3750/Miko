@@ -29,6 +29,48 @@
 
     </com.google.android.material.textfield.TextInputLayout>
 
+    <!-- Category Scope Selection (only shown for new categories) -->
+    <LinearLayout
+        android:id="@+id/scope_container"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:layout_marginTop="12dp"
+        android:layout_marginStart="16dp"
+        android:layout_marginEnd="16dp"
+        android:visibility="gone">
+
+        <RadioGroup
+            android:id="@+id/scope_radio_group"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <com.google.android.material.radiobutton.MaterialRadioButton
+                android:id="@+id/scope_manga"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Manga/Webtoon"
+                android:paddingStart="8dp" />
+
+            <com.google.android.material.radiobutton.MaterialRadioButton
+                android:id="@+id/scope_novel"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Novel"
+                android:paddingStart="8dp" />
+
+            <com.google.android.material.radiobutton.MaterialRadioButton
+                android:id="@+id/scope_both"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Both"
+                android:paddingStart="8dp" />
+
+        </RadioGroup>
+
+    </LinearLayout>
+
     <eu.kanade.tachiyomi.widget.TriStateCheckBox
         android:id="@+id/download_new"
         android:layout_width="match_parent"

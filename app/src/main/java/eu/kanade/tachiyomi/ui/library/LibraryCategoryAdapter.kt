@@ -20,6 +20,8 @@ import yokai.domain.category.interactor.GetCategories
 import yokai.domain.chapter.interactor.GetChapter
 import yokai.domain.history.interactor.GetHistory
 import yokai.domain.ui.UiPreferences
+import yokai.core.content.ContentType
+import yokai.core.mode.ModeManager
 import yokai.i18n.MR
 import yokai.util.lang.getString
 
@@ -143,6 +145,21 @@ class LibraryCategoryAdapter(val controller: LibraryController?) :
     fun allIndexOf(manga: Manga): List<Int> {
         return currentItems.mapIndexedNotNull { index, it ->
             if (it is LibraryMangaItem && it.manga.manga.id == manga.id) {
+                index
+            } else {
+                null
+            }
+        }
+    }
+
+    /**
+     * Returns the position in the adapter for the given novel.
+     *
+     * @param novel the novel to find.
+     */
+    fun allIndexOf(novel: yokai.domain.novel.Novel): List<Int> {
+        return currentItems.mapIndexedNotNull { index, it ->
+            if (it is LibraryNovelItem && it.novel.id == novel.id) {
                 index
             } else {
                 null
@@ -297,7 +314,12 @@ class LibraryCategoryAdapter(val controller: LibraryController?) :
 
     private fun getSort(position: Int): LibrarySort {
         val header = (getItem(position) as? LibraryItem)?.header
-        return header?.category?.sortingMode() ?: LibrarySort.DragAndDrop
+        // Return category's sort mode if set, otherwise use mode-appropriate default
+        // Novel mode defaults to Title sort instead of DragAndDrop
+        return header?.category?.sortingMode() ?: when (ModeManager.currentMode.value) {
+            ContentType.NOVEL -> LibrarySort.Title
+            ContentType.MANGA -> LibrarySort.DragAndDrop
+        }
     }
 
     interface LibraryListener {

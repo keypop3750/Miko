@@ -34,12 +34,27 @@ import eu.kanade.tachiyomi.util.view.setOnQueryTextChangeListener
 import eu.kanade.tachiyomi.util.view.snack
 import eu.kanade.tachiyomi.util.view.toolbarHeight
 import eu.kanade.tachiyomi.util.view.withFadeTransaction
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.launch
 import uy.kohesive.injekt.injectLazy
+import yokai.core.content.ContentType
+import yokai.core.mode.ModeManager
 import yokai.i18n.MR
 import yokai.util.lang.getString
 
 /**
- * This controller shows and manages the different search result in global search.
+ * LEGACY: This controller shows and manages the different search results in global search.
+ * 
+ * This View-based implementation is still functional but should be migrated to Compose UI
+ * to match the new BrowseScreen architecture. The controller searches across all enabled
+ * sources and displays results grouped by source.
+ * 
+ * TODO: Rebuild as Compose-based GlobalSearchScreen with:
+ * - Compose UI matching BrowseScreen styling
+ * - ViewModel for state management (similar to BrowseViewModel)
+ * - Reactive theme updates with ModeManager
+ * - Better performance with LazyColumn
+ * 
  * This controller should only handle UI actions, IO actions should be done by [GlobalSearchPresenter]
  * [GlobalSearchCardAdapter.OnMangaClickListener] called when manga is clicked in global search
  */
@@ -167,6 +182,23 @@ open class GlobalSearchController(
         // Inflate menu.
         inflater.inflate(R.menu.catalogue_new_list, menu)
 
+        // Find and setup mode toggle on the searchToolbar (it's defined in search.xml menu)
+        val searchToolbarMenu = activityBinding?.searchToolbar?.menu
+        searchToolbarMenu?.findItem(R.id.action_mode_toggle)?.let { modeToggle ->
+            modeToggle.isVisible = true
+            setupModeToggle(modeToggle)
+        }
+
+        // Setup the mode toggle item click handler on searchToolbar
+        activityBinding?.searchToolbar?.setOnMenuItemClickListener { item ->
+            if (item.itemId == R.id.action_mode_toggle) {
+                ModeManager.toggleMode()
+                true
+            } else {
+                false
+            }
+        }
+
         // Initialize search menu
         activityBinding?.searchToolbar?.setQueryHint(view?.context?.getString(MR.strings.global_search), false)
         activityBinding?.searchToolbar?.searchItem?.expandActionView()
@@ -185,6 +217,58 @@ open class GlobalSearchController(
             setTitle() // Update toolbar title
             true
         }
+    }
+
+    override fun onOptionsItemSelected(item: MenuItem): Boolean {
+        when (item.itemId) {
+            R.id.action_mode_toggle -> {
+                // Toggle mode and re-search
+                ModeManager.toggleMode()
+                return true
+            }
+        }
+        return super.onOptionsItemSelected(item)
+    }
+
+    /**
+     * Setup the mode toggle button.
+     * Shows novel icon when in novel mode, manga icon when in manga mode.
+     */
+    private fun setupModeToggle(modeToggle: MenuItem) {
+        updateModeToggleIcon(modeToggle)
+        
+        // Track the initial mode to detect actual changes
+        var lastMode = ModeManager.currentMode.value
+        
+        // Observe mode changes and re-search when mode changes
+        viewScope.launch {
+            ModeManager.currentMode.collectLatest { mode ->
+                updateModeToggleIcon(modeToggle)
+                // Only re-search if the mode actually changed (not on initial collection)
+                if (mode != lastMode) {
+                    lastMode = mode
+                    // Re-search with new mode's sources
+                    presenter.researchWithNewMode()
+                }
+            }
+        }
+    }
+
+    /**
+     * Update the mode toggle icon based on current mode.
+     */
+    private fun updateModeToggleIcon(menuItem: MenuItem) {
+        val currentMode = ModeManager.currentMode.value
+        val icon = when (currentMode) {
+            ContentType.MANGA -> R.drawable.ic_book_24dp // Manga icon
+            ContentType.NOVEL -> R.drawable.ic_library_books_24dp // Novel icon
+        }
+        val title = when (currentMode) {
+            ContentType.MANGA -> "Switch to Novel Mode"
+            ContentType.NOVEL -> "Switch to Manga Mode"
+        }
+        menuItem.setIcon(icon)
+        menuItem.title = title
     }
 
     override fun onChangeStarted(handler: ControllerChangeHandler, type: ControllerChangeType) {
@@ -248,6 +332,8 @@ open class GlobalSearchController(
     }
 
     override fun onDestroyView(view: View) {
+        // Remove the mode toggle from searchToolbar to avoid duplicates
+        activityBinding?.searchToolbar?.menu?.removeItem(R.id.action_mode_toggle)
         adapter = null
         super.onDestroyView(view)
     }

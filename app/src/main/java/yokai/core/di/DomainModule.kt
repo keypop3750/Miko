@@ -2,6 +2,7 @@ package yokai.core.di
 
 import org.koin.dsl.module
 import yokai.data.category.CategoryRepositoryImpl
+import yokai.data.category.NovelCategoryRepositoryImpl
 import yokai.data.chapter.ChapterRepositoryImpl
 import yokai.data.extension.repo.ExtensionRepoRepositoryImpl
 import yokai.data.history.HistoryRepositoryImpl
@@ -10,11 +11,17 @@ import yokai.data.manga.MangaRepositoryImpl
 import yokai.data.source.browse.filter.SavedSearchRepositoryImpl
 import yokai.data.track.TrackRepositoryImpl
 import yokai.domain.category.CategoryRepository
+import yokai.domain.category.NovelCategoryRepository
 import yokai.domain.category.interactor.DeleteCategories
+import yokai.domain.category.interactor.DeleteNovelCategories
 import yokai.domain.category.interactor.GetCategories
+import yokai.domain.category.interactor.GetNovelCategories
 import yokai.domain.category.interactor.InsertCategories
+import yokai.domain.category.interactor.InsertNovelCategories
 import yokai.domain.category.interactor.SetMangaCategories
+import yokai.domain.category.interactor.SetNovelCategories
 import yokai.domain.category.interactor.UpdateCategories
+import yokai.domain.category.interactor.UpdateNovelCategories
 import yokai.domain.chapter.ChapterRepository
 import yokai.domain.chapter.interactor.DeleteChapter
 import yokai.domain.chapter.interactor.GetAvailableScanlators
@@ -62,6 +69,13 @@ fun domainModule() = module {
     factory { InsertCategories(get()) }
     factory { UpdateCategories(get()) }
 
+    // Novel categories (separate from manga categories)
+    single<NovelCategoryRepository> { NovelCategoryRepositoryImpl(get()) }
+    factory { DeleteNovelCategories(get()) }
+    factory { GetNovelCategories(get()) }
+    factory { InsertNovelCategories(get()) }
+    factory { UpdateNovelCategories(get()) }
+
     single<ExtensionRepoRepository> { ExtensionRepoRepositoryImpl(get()) }
     factory { CreateExtensionRepo(get()) }
     factory { DeleteExtensionRepo(get()) }
@@ -83,6 +97,7 @@ fun domainModule() = module {
     factory { UpdateManga(get()) }
 
     factory { SetMangaCategories(get()) }
+    factory { SetNovelCategories(get()) }
 
     single<ChapterRepository> { ChapterRepositoryImpl(get()) }
     factory { DeleteChapter(get()) }

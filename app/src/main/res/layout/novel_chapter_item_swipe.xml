@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/chapter_layout"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="?attr/background">
+
+    <!-- End View (Right Swipe - Read/Unread) -->
+    <FrameLayout
+        android:id="@+id/end_view"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:visibility="gone"
+        android:background="@color/md_green_800">
+
+        <ImageView
+            android:id="@+id/read"
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            app:tint="@color/md_white_1000"
+            android:layout_gravity="end|center"
+            android:layout_marginEnd="21dp"
+            android:src="@drawable/ic_eye_24dp"
+            android:contentDescription="Mark as read" />
+    </FrameLayout>
+
+    <!-- Start View (Left Swipe - Bookmark) -->
+    <FrameLayout
+        android:id="@+id/start_view"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:visibility="gone"
+        android:background="?attr/colorSecondary">
+
+        <ImageView
+            android:id="@+id/bookmark"
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:layout_gravity="start|center"
+            android:layout_marginStart="21dp"
+            app:tint="?colorOnSecondary"
+            android:src="@drawable/ic_bookmark_24dp"
+            android:contentDescription="Bookmark" />
+    </FrameLayout>
+
+    <!-- Front View (Main Content) -->
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:id="@+id/front_view"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@drawable/list_item_selector"
+        android:paddingHorizontal="16dp"
+        android:paddingVertical="12dp">
+
+        <!-- Chapter Title -->
+        <TextView
+            android:id="@+id/chapter_title"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:textAppearance="@style/TextAppearance.Material3.BodyLarge"
+            android:maxLines="2"
+            android:ellipsize="end"
+            app:layout_constraintEnd_toStartOf="@id/download_button"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent"
+            tools:text="Chapter Title That Might Be Very Long" />
+
+        <!-- Chapter Info (date, word count, progress) -->
+        <TextView
+            android:id="@+id/chapter_info"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:textAppearance="@style/TextAppearance.Material3.BodySmall"
+            android:textColor="?attr/colorOnSurfaceVariant"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/chapter_title"
+            tools:text="Oct 10, 2025 • 45% read • 2.5k words" />
+
+        <!-- Download Button -->
+        <include
+            android:id="@+id/download_button"
+            layout="@layout/download_button"
+            android:layout_width="28dp"
+            android:layout_height="28dp"
+            android:layout_marginStart="8dp"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintBottom_toBottomOf="parent" />
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
+
+</FrameLayout>

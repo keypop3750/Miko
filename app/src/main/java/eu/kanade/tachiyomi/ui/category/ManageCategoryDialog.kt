@@ -4,9 +4,11 @@ import android.app.Activity
 import android.app.Dialog
 import android.content.DialogInterface
 import android.os.Bundle
+import android.widget.RadioButton
 import androidx.core.view.isVisible
 import androidx.core.widget.addTextChangedListener
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import eu.kanade.tachiyomi.R
 import eu.kanade.tachiyomi.core.preference.Preference
 import eu.kanade.tachiyomi.data.database.models.Category
 import eu.kanade.tachiyomi.data.library.LibraryUpdateJob
@@ -21,8 +23,13 @@ import eu.kanade.tachiyomi.util.view.withFadeTransaction
 import eu.kanade.tachiyomi.widget.TriStateCheckBox
 import kotlinx.coroutines.runBlocking
 import uy.kohesive.injekt.injectLazy
+import yokai.core.category.CategoryScope
+import yokai.core.content.ContentType
+import yokai.core.mode.ModeManager
 import yokai.domain.category.interactor.GetCategories
+import yokai.domain.category.interactor.GetNovelCategories
 import yokai.domain.category.interactor.InsertCategories
+import yokai.domain.category.interactor.InsertNovelCategories
 import yokai.i18n.MR
 import yokai.util.lang.getString
 import android.R as AR
@@ -40,9 +47,14 @@ class ManageCategoryDialog(bundle: Bundle? = null) :
 
     private val preferences by injectLazy<PreferencesHelper>()
     private val getCategories by injectLazy<GetCategories>()
+    private val getNovelCategories by injectLazy<GetNovelCategories>()
     private val insertCategories by injectLazy<InsertCategories>()
+    private val insertNovelCategories by injectLazy<InsertNovelCategories>()
 
     lateinit var binding: MangaCategoryDialogBinding
+    
+    private val currentMode: ContentType
+        get() = ModeManager.currentMode.value
 
     override fun onCreateDialog(savedViewState: Bundle?): Dialog {
         val dialog = dialog(activity!!).create()
@@ -90,14 +102,49 @@ class ManageCategoryDialog(bundle: Bundle? = null) :
             ) {
                 category.name = text
                 if (this.category == null) {
+                    // New category - check scope selection
+                    val scope = getSelectedScope()
+                    
                     // FIXME: Don't do blocking
-                    val categories = runBlocking { getCategories.await() }
-                    category.order = (categories.maxOfOrNull { it.order } ?: 0) + 1
-                    category.mangaSort = LibrarySort.Title.categoryValue
-                    category.id = runBlocking { insertCategories.awaitOne(category) }?.toInt()
+                    runBlocking {
+                        when (scope) {
+                            CategoryScope.MANGA_ONLY -> {
+                                val categories = getCategories.await()
+                                category.order = (categories.maxOfOrNull { it.order } ?: 0) + 1
+                                category.mangaSort = LibrarySort.Title.categoryValue
+                                category.id = insertCategories.awaitOne(category)?.toInt()
+                            }
+                            CategoryScope.NOVEL_ONLY -> {
+                                val categories = getNovelCategories.await()
+                                category.order = (categories.maxOfOrNull { it.order } ?: 0) + 1
+                                category.mangaSort = LibrarySort.Title.categoryValue
+                                category.id = insertNovelCategories.awaitOne(category)?.toInt()
+                            }
+                            CategoryScope.BOTH -> {
+                                // Create in BOTH tables
+                                val mangaCategories = getCategories.await()
+                                category.order = (mangaCategories.maxOfOrNull { it.order } ?: 0) + 1
+                                category.mangaSort = LibrarySort.Title.categoryValue
+                                category.id = insertCategories.awaitOne(category)?.toInt()
+                                
+                                // Create a separate instance for novels
+                                val novelCat = Category.create(text)
+                                val novelCategories = getNovelCategories.await()
+                                novelCat.order = (novelCategories.maxOfOrNull { it.order } ?: 0) + 1
+                                novelCat.mangaSort = LibrarySort.Title.categoryValue
+                                insertNovelCategories.awaitOne(novelCat)
+                            }
+                        }
+                    }
                     this.category = category
                 } else {
-                    runBlocking { insertCategories.awaitOne(category) }
+                    // Editing existing category - just update current mode's table
+                    runBlocking {
+                        when (currentMode) {
+                            ContentType.MANGA -> insertCategories.awaitOne(category)
+                            ContentType.NOVEL -> insertNovelCategories.awaitOne(category)
+                        }
+                    }
                 }
             } else if (categoryExists) {
                 binding.categoryTextLayout.error =
@@ -139,8 +186,30 @@ class ManageCategoryDialog(bundle: Bundle? = null) :
      */
     private fun categoryExists(name: String): Boolean {
         // FIXME: Don't do blocking
-        return runBlocking { getCategories.await() }.any {
+        // Check in the appropriate table(s) based on scope
+        return runBlocking {
+            when (currentMode) {
+                ContentType.MANGA -> getCategories.await()
+                ContentType.NOVEL -> getNovelCategories.await()
+            }
+        }.any {
             it.name.equals(name, true) && category?.id != it.id
+        }
+    }
+    
+    /**
+     * Get the selected scope from radio buttons.
+     * Default to current mode if no scope container is visible.
+     */
+    private fun getSelectedScope(): CategoryScope {
+        return when (binding.scopeRadioGroup.checkedRadioButtonId) {
+            R.id.scope_manga -> CategoryScope.MANGA_ONLY
+            R.id.scope_novel -> CategoryScope.NOVEL_ONLY
+            R.id.scope_both -> CategoryScope.BOTH
+            else -> when (currentMode) {
+                ContentType.MANGA -> CategoryScope.MANGA_ONLY
+                ContentType.NOVEL -> CategoryScope.NOVEL_ONLY
+            }
         }
     }
 
@@ -149,6 +218,18 @@ class ManageCategoryDialog(bundle: Bundle? = null) :
             binding.categoryTextLayout.isVisible = false
         }
         binding.editCategories.isVisible = category != null
+        
+        // Show scope selection only for new categories
+        val isNewCategory = category == null
+        binding.scopeContainer.isVisible = isNewCategory
+        if (isNewCategory) {
+            // Default to current mode
+            when (currentMode) {
+                ContentType.MANGA -> binding.scopeRadioGroup.check(R.id.scope_manga)
+                ContentType.NOVEL -> binding.scopeRadioGroup.check(R.id.scope_novel)
+            }
+        }
+        
         binding.editCategories.setOnClickListener {
             router.popCurrentController()
             router.pushController(CategoryController().withFadeTransaction())

@@ -28,7 +28,7 @@ class CategoryRepositoryImpl(private val handler: DatabaseHandler) : CategoryRep
             categoriesQueries.selectLastInsertedRowId()
         }
 
-    override suspend fun insertBulk(categories: List<Category>) =
+    override suspend fun insertBulk(categories: List<Category>) {
         handler.await(true) {
             categories.forEach { category ->
                 categoriesQueries.insert(
@@ -39,6 +39,7 @@ class CategoryRepositoryImpl(private val handler: DatabaseHandler) : CategoryRep
                 )
             }
         }
+    }
 
     override suspend fun update(update: CategoryUpdate): Boolean {
         return try {
@@ -74,6 +75,7 @@ class CategoryRepositoryImpl(private val handler: DatabaseHandler) : CategoryRep
         }
     }
 
-    override suspend fun delete(id: Long) =
+    override suspend fun delete(id: Long) {
         handler.await { categoriesQueries.delete(id) }
+    }
 }

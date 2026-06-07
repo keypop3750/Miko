@@ -131,6 +131,31 @@ class SettingsLibraryController : SettingsLegacyController() {
                     true
                 }
             }
+            
+            intListPreference(activity) {
+                key = Keys.homeLibraryCategory
+                titleRes = MR.strings.home_library_category
+                
+                val categories = listOf(Category.createDefault(context)) + dbCategories
+                entries =
+                    listOf(context.getString(MR.strings.last_used)) +
+                        categories.map { it.name }.toTypedArray()
+                entryValues = listOf(-1) + categories.mapNotNull { it.id }.toList()
+                defaultValue = "-1"
+
+                val categoryName: (Int) -> String = { catId ->
+                    when (catId) {
+                        -1 -> context.getString(MR.strings.last_used)
+                        else -> categories.find { it.id == preferences.homeLibraryCategory().get() }?.name
+                            ?: context.getString(MR.strings.last_used)
+                    }
+                }
+                summary = categoryName(preferences.homeLibraryCategory().get())
+                onChange { newValue ->
+                    summary = categoryName(newValue as Int)
+                    true
+                }
+            }
         }
 
         preferenceCategory {
@@ -232,6 +257,17 @@ class SettingsLibraryController : SettingsLegacyController() {
                 entriesRes = entries.keys.toTypedArray()
                 entryValues = entries.values.toList()
                 noSelectionRes = MR.strings.none
+            }
+        }
+
+        preferenceCategory {
+            title = "Experimental Features"
+
+            switchPreference {
+                key = "use_compose_library_content"
+                title = "Use Compose Library Content"
+                summary = "Enable experimental Compose-based library grid/list view. Requires app restart."
+                defaultValue = false
             }
         }
     }

@@ -15,8 +15,15 @@ import yokai.domain.ui.UiPreferences
 
 abstract class LibraryItem(
     header: LibraryHeaderItem,
-    internal val context: Context?,
+    context: Context?,
 ) : AbstractSectionableItem<LibraryHolder, LibraryHeaderItem>(header), IFilterable<String> {
+
+    /**
+     * FIX: Use application context to prevent leaking Activity references.
+     * LibraryItem objects are cached in static fields (LibraryPresenter.lastDisplayedLibrary),
+     * so holding an Activity context causes memory leaks.
+     */
+    internal val context: Context? = context?.applicationContext
 
     var filter = ""
 

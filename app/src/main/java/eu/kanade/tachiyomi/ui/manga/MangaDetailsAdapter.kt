@@ -11,6 +11,12 @@ import yokai.i18n.MR
 import yokai.util.lang.getString
 import dev.icerock.moko.resources.compose.stringResource
 import eu.kanade.tachiyomi.data.preference.PreferencesHelper
+import eu.kanade.tachiyomi.databinding.MangaDetailsControllerBinding
+import eu.kanade.tachiyomi.databinding.MangaDetailsActivityBinding
+import androidx.recyclerview.widget.RecyclerView
+import com.google.android.material.imageview.ShapeableImageView
+import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+import eu.kanade.tachiyomi.ui.base.MaterialFastScroll
 import eu.kanade.tachiyomi.ui.manga.chapter.BaseChapterAdapter
 import eu.kanade.tachiyomi.ui.manga.chapter.ChapterItem
 import eu.kanade.tachiyomi.util.chapter.ChapterUtil
@@ -19,9 +25,98 @@ import uy.kohesive.injekt.injectLazy
 import java.text.DecimalFormat
 import java.text.DecimalFormatSymbols
 
-class MangaDetailsAdapter(
-    val controller: MangaDetailsController,
-) : BaseChapterAdapter<IFlexible<*>>(controller) {
+class MangaDetailsAdapter private constructor(
+    controllerOrDelegate: Any,
+    val delegate: MangaDetailsInterface,
+    val presenter: MangaDetailsPresenter,
+    bindingProvider: (() -> Any)?,
+) : BaseChapterAdapter<IFlexible<*>>(delegate) {
+
+    // Constructor for Controller-based usage (existing code)
+    constructor(controller: MangaDetailsController) : this(
+        controllerOrDelegate = controller,
+        delegate = controller,
+        presenter = controller.presenter,
+        bindingProvider = { controller.binding }
+    )
+    
+    // Constructor for Activity-based usage with Activity binding
+    constructor(
+        delegate: MangaDetailsInterface,
+        presenter: MangaDetailsPresenter,
+        binding: MangaDetailsActivityBinding
+    ) : this(
+        controllerOrDelegate = delegate,
+        delegate = delegate,
+        presenter = presenter,
+        bindingProvider = { binding }
+    )
+    
+    // Legacy constructor for Activity-based usage with Controller binding
+    constructor(
+        delegate: MangaDetailsInterface,
+        presenter: MangaDetailsPresenter,
+        binding: MangaDetailsControllerBinding
+    ) : this(
+        controllerOrDelegate = delegate,
+        delegate = delegate,
+        presenter = presenter,
+        bindingProvider = { binding }
+    )
+
+    val controller: MangaDetailsController? = controllerOrDelegate as? MangaDetailsController
+    
+    // Internal binding storage (supports both Controller and Activity bindings)
+    private val bindingInternal: Any by lazy { 
+        bindingProvider?.invoke() ?: throw IllegalStateException("Binding not available") 
+    }
+    
+    // Type-safe binding access with duck-typing for common properties
+    // Both MangaDetailsControllerBinding and MangaDetailsActivityBinding have the same view structure
+    val binding: BindingWrapper by lazy {
+        when (val b = bindingInternal) {
+            is MangaDetailsControllerBinding -> BindingWrapper.Controller(b)
+            is MangaDetailsActivityBinding -> BindingWrapper.Activity(b)
+            else -> throw IllegalStateException("Unknown binding type: ${b.javaClass}")
+        }
+    }
+    
+    // Wrapper to provide common interface for both binding types
+    sealed class BindingWrapper {
+        abstract val recycler: RecyclerView
+        abstract val swipeRefresh: SwipeRefreshLayout
+        abstract val mangaCoverFull: ShapeableImageView
+        abstract val fastScroller: MaterialFastScroll
+        abstract val touchView: View
+        abstract val tabletRecycler: RecyclerView
+        abstract val tabletDivider: View
+        abstract val tabletOverlay: View
+        abstract val root: View
+        
+        class Controller(private val binding: MangaDetailsControllerBinding) : BindingWrapper() {
+            override val recycler get() = binding.recycler
+            override val swipeRefresh get() = binding.swipeRefresh
+            override val mangaCoverFull get() = binding.mangaCoverFull
+            override val fastScroller get() = binding.fastScroller
+            override val touchView get() = binding.touchView
+            override val tabletRecycler get() = binding.tabletRecycler
+            override val tabletDivider get() = binding.tabletDivider
+            override val tabletOverlay get() = binding.tabletOverlay
+            override val root get() = binding.root
+        }
+        
+        class Activity(private val binding: MangaDetailsActivityBinding) : BindingWrapper() {
+            override val recycler get() = binding.recycler
+            override val swipeRefresh get() = binding.swipeRefresh
+            override val mangaCoverFull get() = binding.mangaCoverFull
+            override val fastScroller get() = binding.fastScroller
+            override val touchView get() = binding.touchView
+            override val tabletRecycler get() = binding.tabletRecycler
+            override val tabletDivider get() = binding.tabletDivider
+            override val tabletOverlay get() = binding.tabletOverlay
+            override val root get() = binding.root
+        }
+    }
 
     val preferences: PreferencesHelper by injectLazy()
 
@@ -30,9 +125,6 @@ class MangaDetailsAdapter(
 
     var items: List<ChapterItem> = emptyList()
         private set
-
-    val delegate: MangaDetailsInterface = controller
-    val presenter = controller.presenter
 
     val decimalFormat = DecimalFormat(
         "#.###",
@@ -68,14 +160,14 @@ class MangaDetailsAdapter(
         super.onItemSwiped(position, direction)
         when (direction) {
             ItemTouchHelper.RIGHT -> if (recyclerView.resources.isLTR) {
-                controller.bookmarkChapter(position)
+                delegate.bookmarkChapter(position)
             } else {
-                controller.toggleReadChapter(position)
+                delegate.toggleReadChapter(position)
             }
             ItemTouchHelper.LEFT -> if (recyclerView.resources.isLTR) {
-                controller.toggleReadChapter(position)
+                delegate.toggleReadChapter(position)
             } else {
-                controller.bookmarkChapter(position)
+                delegate.bookmarkChapter(position)
             }
         }
     }
@@ -150,5 +242,23 @@ class MangaDetailsAdapter(
         fun showTrackingSheet()
         fun updateScroll()
         fun setFavButtonPopup(popupView: View)
+        
+        /**
+         * Enable or disable the SwipeRefreshLayout.
+         * Used by MangaHeaderHolder to re-enable swipe after text selection.
+         */
+        fun setSwipeRefreshEnabled(enabled: Boolean)
+        
+        /**
+         * Bookmark or unbookmark a chapter at the given position.
+         * Called from swipe gesture handler.
+         */
+        fun bookmarkChapter(position: Int)
+        
+        /**
+         * Toggle read/unread status of chapter at the given position.
+         * Called from swipe gesture handler.
+         */
+        fun toggleReadChapter(position: Int)
     }
 }

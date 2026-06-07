@@ -42,6 +42,9 @@ open class MaterialFastScroll @JvmOverloads constructor(context: Context, attrs:
 
     // Overriding to force a distance moved before scrolling
     override fun onTouchEvent(event: MotionEvent): Boolean {
+        // Null check to prevent crash when recyclerView not initialized
+        val recyclerView = recyclerView ?: return super.onTouchEvent(event)
+        
         if (controller?.isDragging == true ||
             recyclerView.computeVerticalScrollRange() <= recyclerView.computeVerticalScrollExtent()
         ) {

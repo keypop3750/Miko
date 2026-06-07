@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Novel reader chapter navigation bar -->
+<!-- EXACTLY matches manga reader_nav.xml visual appearance -->
+<eu.kanade.tachiyomi.ui.reader.ReaderNavView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/novel_reader_nav"
+    android:background="@drawable/chapter_nav"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:paddingStart="12dp"
+    android:paddingEnd="12dp"
+    android:layout_gravity="top"
+    android:paddingBottom="6dp"
+    android:paddingTop="6dp"
+    android:clickable="true"
+    android:focusable="true"
+    android:gravity="center"
+    android:layoutDirection="ltr"
+    android:orientation="horizontal">
+
+    <com.google.android.material.progressindicator.CircularProgressIndicator
+        android:id="@+id/left_progress"
+        app:indicatorSize="16dp"
+        app:trackThickness="3dp"
+        android:indeterminate="true"
+        android:visibility="gone"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:layout_gravity="center" />
+
+    <ImageButton
+        android:id="@+id/left_chapter"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:layout_gravity="center"
+        android:visibility="visible"
+        android:background="?selectableItemBackgroundBorderless"
+        android:contentDescription="@string/previous_chapter"
+        android:padding="@dimen/material_layout_keylines_screen_edge_margin"
+        app:tint="?actionBarTintColor"
+        app:srcCompat="@drawable/ic_skip_previous_24" />
+
+    <!-- Spacer to center navigation buttons -->
+    <View
+        android:layout_width="0dp"
+        android:layout_height="1dp"
+        android:layout_weight="1" />
+
+    <ImageButton
+        android:id="@+id/right_chapter"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:layout_gravity="center"
+        android:background="?selectableItemBackgroundBorderless"
+        android:contentDescription="@string/next_chapter"
+        android:padding="@dimen/material_layout_keylines_screen_edge_margin"
+        app:tint="?actionBarTintColor"
+        app:srcCompat="@drawable/ic_skip_next_24" />
+
+    <com.google.android.material.progressindicator.CircularProgressIndicator
+        android:id="@+id/right_progress"
+        app:indicatorSize="16dp"
+        app:trackThickness="3dp"
+        android:indeterminate="true"
+        android:visibility="gone"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:layout_gravity="center" />
+
+</eu.kanade.tachiyomi.ui.reader.ReaderNavView>

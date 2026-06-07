@@ -1,0 +1,2 @@
+-- Add vibrant_cover_color column to novels table for theming support
+ALTER TABLE novels ADD COLUMN vibrant_cover_color INTEGER DEFAULT NULL;

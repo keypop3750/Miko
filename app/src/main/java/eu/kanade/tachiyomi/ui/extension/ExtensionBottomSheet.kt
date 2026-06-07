@@ -7,9 +7,29 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.LinearLayout
 import android.widget.TextView
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRow
+import androidx.compose.material3.Text
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.core.view.WindowInsetsCompat.Type.systemBars
+import androidx.core.view.isVisible
 import androidx.core.view.updatePaddingRelative
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.ViewModelStoreOwner
+import androidx.lifecycle.findViewTreeViewModelStoreOwner
 import androidx.recyclerview.widget.RecyclerView
+import co.touchlab.kermit.Logger
 import com.google.android.material.bottomsheet.BottomSheetBehavior
 import com.google.android.material.tabs.TabLayout
 import eu.davidea.flexibleadapter.FlexibleAdapter
@@ -45,13 +65,27 @@ import eu.kanade.tachiyomi.util.view.setText
 import eu.kanade.tachiyomi.util.view.setTitle
 import eu.kanade.tachiyomi.util.view.smoothScrollToTop
 import eu.kanade.tachiyomi.util.view.withFadeTransaction
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
 import uy.kohesive.injekt.injectLazy
 import yokai.domain.base.BasePreferences
 import yokai.domain.base.BasePreferences.ExtensionInstaller
 import yokai.i18n.MR
+import yokai.presentation.extension.ExtensionEvent
+import yokai.presentation.extension.ExtensionSheetContent
+import yokai.presentation.extension.ExtensionTabScreen
+import yokai.presentation.extension.ExtensionViewModel
+import yokai.presentation.extension.MigrationAction
+import yokai.presentation.extension.MigrationEvent
+import yokai.presentation.extension.MigrationTabScreen
+import yokai.presentation.extension.MigrationViewModel
+import yokai.presentation.extension.repo.ExtensionRepoController
+import yokai.presentation.theme.YokaiTheme
 import yokai.util.lang.getString
+import eu.kanade.tachiyomi.ui.setting.controllers.SettingsBrowseController
 import android.R as AR
 
 class ExtensionBottomSheet @JvmOverloads constructor(context: Context, attrs: AttributeSet? = null) :
@@ -60,16 +94,45 @@ class ExtensionBottomSheet @JvmOverloads constructor(context: Context, attrs: At
     FlexibleAdapter.OnItemClickListener,
     FlexibleAdapter.OnItemLongClickListener,
     SourceAdapter.OnAllClickListener,
-    BaseMigrationInterface {
+    BaseMigrationInterface,
+    ExtensionBottomSheetLike {
 
     private val basePreferences: BasePreferences by injectLazy()
+    private val logger = Logger.withTag("ExtensionBottomSheet")
 
-    var sheetBehavior: BottomSheetBehavior<*>? = null
+    override var sheetBehavior: BottomSheetBehavior<*>? = null
 
     var shouldCallApi = false
+    
+    /**
+     * Sheet expansion progress (0.0 = collapsed, 1.0 = expanded).
+     * Updated by BrowseController's BottomSheetCallback.onSlide().
+     * Exposed to Compose for progress-based animations.
+     */
+    private val _sheetProgress = MutableStateFlow(0f)
+    val sheetProgress = _sheetProgress.asStateFlow()
+    
+    /**
+     * Update sheet progress from BrowseController's onSlide callback.
+     */
+    fun updateProgress(progress: Float) {
+        _sheetProgress.value = progress.coerceIn(0f, 1f)
+    }
 
     /**
-     * Adapter containing the list of extensions
+     * Whether to use Compose UI for the extension/migration tabs.
+     * Set to false to use legacy ViewPager implementation.
+     */
+    private val useComposeUi = false
+    
+    /**
+     * ViewModels for Compose UI mode
+     */
+    private var extensionViewModel: ExtensionViewModel? = null
+    private var migrationViewModel: MigrationViewModel? = null
+
+    /**
+     * Adapter containing the list of extensions (legacy mode only)
      */
     private var extAdapter: ExtensionAdapter? = null
     private var migAdapter: FlexibleAdapter<IFlexible<*>>? = null
@@ -88,9 +151,9 @@ class ExtensionBottomSheet @JvmOverloads constructor(context: Context, attrs: At
     var boundViews = arrayListOf<RecyclerWithScrollerView>()
 
     val extensionFrameLayout: RecyclerWithScrollerView?
-        get() = binding.pager.findViewWithTag("TabbedRecycler0") as? RecyclerWithScrollerView
+        get() = if (useComposeUi) null else binding.pager.findViewWithTag("TabbedRecycler0") as? RecyclerWithScrollerView
     val migrationFrameLayout: RecyclerWithScrollerView?
-        get() = binding.pager.findViewWithTag("TabbedRecycler1") as? RecyclerWithScrollerView
+        get() = if (useComposeUi) null else binding.pager.findViewWithTag("TabbedRecycler1") as? RecyclerWithScrollerView
 
     var isExpanding = false
 
@@ -100,20 +163,57 @@ class ExtensionBottomSheet @JvmOverloads constructor(context: Context, attrs: At
     }
 
     fun onCreate(controller: BrowseController) {
-        // Initialize adapter, scroll listener and recycler views
+        this.controller = controller
+        sheetBehavior = BottomSheetBehavior.from(this)
+        
+        if (useComposeUi) {
+            setupComposeUi()
+        } else {
+            setupLegacyUi()
+        }
+
+        binding.sheetLayout.setOnClickListener {
+            if (!sheetBehavior.isExpanded()) {
+                sheetBehavior?.expand()
+                fetchOnlineExtensionsIfNeeded()
+            } else {
+                sheetBehavior?.collapse()
+            }
+        }
+        
+        // Legacy presenter still needed for some operations
         presenter.attachView(this)
+        presenter.onCreate()
+        updateExtTitle()
+        presenter.getExtensionUpdateCount()
+    }
+    
+    /**
+     * Set up Compose UI for extension and migration tabs.
+     * DISABLED - Using legacy ViewPager instead.
+     */
+    private fun setupComposeUi() {
+        // Disabled - Compose pager removed from layout
+        // Fall back to legacy UI
+        setupLegacyUi()
+    }
+    
+    /**
+     * Set up legacy View-based UI for extension and migration tabs.
+     */
+    private fun setupLegacyUi() {
+        // Initialize adapter, scroll listener and recycler views
         extAdapter = ExtensionAdapter(this)
         extAdapter?.stateRestorationPolicy = RecyclerView.Adapter.StateRestorationPolicy.PREVENT_WHEN_EMPTY
         if (migAdapter == null) {
             migAdapter = SourceAdapter(this)
         }
         migAdapter?.stateRestorationPolicy = RecyclerView.Adapter.StateRestorationPolicy.PREVENT_WHEN_EMPTY
-        sheetBehavior = BottomSheetBehavior.from(this)
+        
         // Create recycler and set adapter.
-
         binding.pager.adapter = TabbedSheetAdapter()
         binding.tabs.setupWithViewPager(binding.pager)
-        this.controller = controller
+        
         binding.pager.doOnApplyWindowInsetsCompat { _, insets, _ ->
             val bottomBar = controller.activityBinding?.bottomNav
             val bottomH = bottomBar?.height ?: insets.getInsets(systemBars()).bottom
@@ -166,25 +266,32 @@ class ExtensionBottomSheet @JvmOverloads constructor(context: Context, attrs: At
                 }
             },
         )
-        presenter.onCreate()
-        updateExtTitle()
-
-        binding.sheetLayout.setOnClickListener {
-            if (!sheetBehavior.isExpanded()) {
-                sheetBehavior?.expand()
-                fetchOnlineExtensionsIfNeeded()
-            } else {
-                sheetBehavior?.collapse()
-            }
-        }
-        presenter.getExtensionUpdateCount()
     }
 
     fun isOnView(view: View): Boolean {
         return "TabbedRecycler${binding.pager.currentItem}" == view.tag
     }
 
+    /**
+     * Update the sheet behavior based on current mode.
+     * Called when mode changes between manga and novel.
+     */
+    fun updateForMode() {
+        if (useComposeUi) {
+            // Compose UI refreshes via ViewModel observing mode changes
+            extensionViewModel?.refresh()
+            migrationViewModel?.refresh()
+        }
+        // The sheet behavior is handled by tab selection listeners
+        // In novel mode, clicking Extensions tab navigates to NovelExtensionController
+        // No additional changes needed here
+    }
+
     fun updatedNestedRecyclers() {
+        if (useComposeUi) {
+            // No-op for Compose - scrolling is handled by LazyColumn
+            return
+        }
         listOf(extensionFrameLayout, migrationFrameLayout).forEachIndexed { index, recyclerWithScrollerBinding ->
             recyclerWithScrollerBinding?.binding?.recycler?.isNestedScrollingEnabled = binding.pager.currentItem == index
         }
@@ -192,12 +299,20 @@ class ExtensionBottomSheet @JvmOverloads constructor(context: Context, attrs: At
 
     fun fetchOnlineExtensionsIfNeeded() {
         if (shouldCallApi) {
-            presenter.findAvailableExtensions()
+            if (useComposeUi) {
+                extensionViewModel?.refresh()
+            } else {
+                presenter.findAvailableExtensions()
+            }
             shouldCallApi = false
         }
     }
 
     fun updateExtTitle() {
+        if (useComposeUi) {
+            // Badge is handled internally by Compose UI observing update count
+            return
+        }
         val extCount = presenter.getExtensionUpdateCount()
         if (extCount > 0) {
             binding.tabs.getTabAt(0)?.orCreateBadge

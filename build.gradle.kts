@@ -16,6 +16,17 @@ plugins {
     alias(libs.plugins.sqldelight) apply false
 }
 
+allprojects {
+    configurations.all {
+        resolutionStrategy {
+            force("org.jetbrains.kotlin:kotlin-stdlib:${kotlinx.versions.kotlin.get()}")
+            force("org.jetbrains.kotlin:kotlin-stdlib-common:${kotlinx.versions.kotlin.get()}")
+            force("org.jetbrains.kotlin:kotlin-stdlib-jdk7:${kotlinx.versions.kotlin.get()}")
+            force("org.jetbrains.kotlin:kotlin-stdlib-jdk8:${kotlinx.versions.kotlin.get()}")
+        }
+    }
+}
+
 tasks.named("dependencyUpdates", com.github.benmanes.gradle.versions.updates.DependencyUpdatesTask::class.java).configure {
     rejectVersionIf {
         val stableKeyword = listOf("RELEASE", "FINAL", "GA").any { candidate.version.uppercase(Locale.ROOT).contains(it) }

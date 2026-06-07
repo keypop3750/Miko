@@ -67,13 +67,19 @@ class PreferencesHelper(val context: Context, val preferenceStore: PreferenceSto
 
     fun hasDeniedA11FilePermission() = preferenceStore.getBoolean(Keys.deniedA11FilePermission, false)
 
-    fun nightMode() = preferenceStore.getInt(Keys.nightMode, AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM)
+    fun nightMode() = preferenceStore.getInt(Keys.nightMode, AppCompatDelegate.MODE_NIGHT_YES)
 
     fun themeDarkAmoled() = preferenceStore.getBoolean(Keys.themeDarkAmoled, false)
 
     private val supportsDynamic = DynamicColors.isDynamicColorAvailable()
     fun lightTheme() = preferenceStore.getEnum(Keys.lightTheme, if (supportsDynamic) Themes.MONET else Themes.DEFAULT)
-    fun darkTheme() = preferenceStore.getEnum(Keys.darkTheme, if (supportsDynamic) Themes.MONET else Themes.DEFAULT)
+    fun darkTheme() = preferenceStore.getEnum(Keys.darkTheme, Themes.MONET)
+    
+    // Novel mode theme preferences
+    fun useSeparateNovelTheme() = preferenceStore.getBoolean(Keys.useSeparateNovelTheme, false)
+    fun novelLightTheme() = preferenceStore.getEnum(Keys.novelLightTheme, if (supportsDynamic) Themes.MONET else Themes.DEFAULT)
+    fun novelDarkTheme() = preferenceStore.getEnum(Keys.novelDarkTheme, if (supportsDynamic) Themes.MONET else Themes.DEFAULT)
+    fun novelThemeDarkAmoled() = preferenceStore.getBoolean(Keys.novelThemeDarkAmoled, false)
 
     fun pageTransitions() = preferenceStore.getBoolean(Keys.enableTransitions, true)
 
@@ -158,6 +164,30 @@ class PreferencesHelper(val context: Context, val preferenceStore: PreferenceSto
 
     fun preloadSize() = preferenceStore.getInt(Keys.preloadSize, 6)
 
+    // Novel reader preferences
+    fun novelTextSize() = preferenceStore.getInt("novel_text_size", 16)
+    
+    fun novelLineHeight() = preferenceStore.getFloat("novel_line_height", 1.5f)
+    
+    fun novelParagraphSpacing() = preferenceStore.getInt("novel_paragraph_spacing", 16)
+    
+    fun novelTextAlignment() = preferenceStore.getInt("novel_text_alignment", 0)
+    
+    // Phase 4.4: Reading mode preference (DEFAULT=0, INFINITE_SCROLL=1, OVERSCROLL=2)
+    fun novelReadingMode() = preferenceStore.getInt("novel_reading_mode", 0)
+
+    // UI/Animation preferences
+    fun enableSharedElementTransitions() = preferenceStore.getBoolean("enable_shared_element_transitions", false)
+
+    // Activity migration feature flag (DISABLED - use Controller pattern like master)
+    fun useMangaDetailsActivity() = preferenceStore.getBoolean("use_manga_details_activity", false).also {
+        android.util.Log.d("PreferencesHelper", "=== useMangaDetailsActivity() called ===")
+        android.util.Log.d("PreferencesHelper", "Default value: false")
+        android.util.Log.d("PreferencesHelper", "Current value: ${it.get()}")
+        android.util.Log.d("PreferencesHelper", "Preference key: use_manga_details_activity")
+        android.util.Log.d("PreferencesHelper", "PreferenceStore: ${preferenceStore::class.simpleName}")
+    }
+
     fun autoUpdateTrack() = preferenceStore.getBoolean(Keys.autoUpdateTrack, true)
 
     fun trackMarkedAsRead() = preferenceStore.getBoolean(Keys.trackMarkedAsRead, false)
@@ -168,6 +198,11 @@ class PreferencesHelper(val context: Context, val preferenceStore: PreferenceSto
     fun lastUsedCatalogueSource() = preferenceStore.getLong(Keys.lastUsedCatalogueSource, -1)
 
     fun lastUsedCategory() = preferenceStore.getInt(Keys.lastUsedCategory, 0)
+    fun lastUsedMangaCategory() = preferenceStore.getInt(Keys.lastUsedMangaCategory, 0)
+    fun lastUsedNovelCategory() = preferenceStore.getInt(Keys.lastUsedNovelCategory, 0)
+    
+    /** Home library category - category to show on app startup. -1 means last used, 0+ is specific category ID */
+    fun homeLibraryCategory() = preferenceStore.getInt(Keys.homeLibraryCategory, -1)
 
     // TODO: SourcePref
     fun lastUsedSources() = preferenceStore.getStringSet("last_used_sources", emptySet())
@@ -222,6 +257,8 @@ class PreferencesHelper(val context: Context, val preferenceStore: PreferenceSto
     fun libraryLayout() = preferenceStore.getInt(Keys.libraryLayout, LibraryItem.LAYOUT_COMFORTABLE_GRID)
 
     fun gridSize() = preferenceStore.getFloat(Keys.gridSize, 1f)
+
+    fun useComposeLibraryContent() = preferenceStore.getBoolean("use_compose_library_content", false)
 
     fun downloadBadge() = preferenceStore.getBoolean(Keys.downloadBadge, false)
 
@@ -309,6 +346,8 @@ class PreferencesHelper(val context: Context, val preferenceStore: PreferenceSto
 
     fun defaultMangaOrder() = preferenceStore.getString("default_manga_order", "")
 
+    fun defaultNovelOrder() = preferenceStore.getString("default_novel_order", "")
+
     fun refreshCoversToo() = preferenceStore.getBoolean(Keys.refreshCoversToo, true)
 
     // TODO: SourcePref
@@ -388,7 +427,9 @@ class PreferencesHelper(val context: Context, val preferenceStore: PreferenceSto
 
     fun themeMangaDetails() = preferenceStore.getBoolean(Keys.themeMangaDetails, true)
 
-    fun useLargeToolbar() = preferenceStore.getBoolean("use_large_toolbar", true)
+    fun useLargeToolbar() = preferenceStore.getBoolean("use_large_toolbar", false)
+    
+    fun sourceOpeningAnimation() = preferenceStore.getBoolean(Keys.sourceOpeningAnimation, true)
 
     fun showSeriesInShortcuts() = preferenceStore.getBoolean(Keys.showSeriesInShortcuts, true)
     fun showSourcesInShortcuts() = preferenceStore.getBoolean(Keys.showSourcesInShortcuts, true)
@@ -422,6 +463,8 @@ class PreferencesHelper(val context: Context, val preferenceStore: PreferenceSto
     fun coverRatios() = preferenceStore.getStringSet(Keys.coverRatios, emptySet())
 
     fun coverColors() = preferenceStore.getStringSet(Keys.coverColors, emptySet())
+
+    fun novelCoverColors() = preferenceStore.getStringSet(Keys.novelCoverColors, emptySet())
 
     fun useStaggeredGrid() = preferenceStore.getBoolean("use_staggered_grid", false)
 }

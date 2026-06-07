@@ -10,6 +10,11 @@ import androidx.compose.ui.unit.dp
 import yokai.presentation.core.components.FastScrollLazyVerticalGrid
 import yokai.presentation.core.util.plus
 
+object CommonMangaItemDefaults {
+    val GridHorizontalSpacer = 4.dp
+    val GridVerticalSpacer = 4.dp
+}
+
 @Composable
 internal fun LazyLibraryGrid(
     modifier: Modifier = Modifier,

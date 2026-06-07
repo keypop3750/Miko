@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.coordinatorlayout.widget.CoordinatorLayout 
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/root_coordinator"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fitsSystemWindows="true"
+    android:background="?attr/background">
+
+    <!-- Main content area with RecyclerView -->
+    <FrameLayout
+        android:id="@+id/novel_content_container"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+
+        <!-- RecyclerView for paragraph-level rendering -->
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/novel_recycler_view"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:clipToPadding="false"
+            android:scrollbars="none"
+            android:background="?attr/background"
+            tools:listitem="@layout/novel_paragraph_item" />
+
+        <!-- Loading indicator (matches manga reader) -->
+        <eu.kanade.tachiyomi.ui.reader.viewer.ReaderProgressIndicator
+            android:id="@+id/loading_indicator"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:visibility="gone" />
+
+    </FrameLayout>
+
+    <!-- Toolbar overlay (matches manga reader) -->
+    <FrameLayout
+        android:id="@+id/app_bar"
+        tools:background="?attr/colorSurface"
+        android:layout_width="match_parent"
+        android:visibility="gone"
+        tools:visibility="visible"
+        android:layout_height="wrap_content">
+
+        <androidx.appcompat.widget.Toolbar
+            android:id="@+id/toolbar"
+            android:layout_width="match_parent"
+            app:navigationContentDescription="@string/close"
+            android:layout_height="?attr/actionBarSize"
+            tools:title="Novel Title"
+            tools:subtitle="Chapter name"
+            app:titleTextColor="?actionBarTintColor"
+            app:subtitleTextColor="@color/action_bar_tint_alpha"
+            android:background="@drawable/reader_toolbar_ripple" />
+    </FrameLayout>
+
+    <!-- Touch overlay for gesture detection -->
+    <View
+        android:id="@+id/touch_view"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+
+    <!-- REMOVED: Navigation bar with prev/next arrows (user preference for cleaner novel reading)
+    <FrameLayout
+        android:id="@+id/nav_layout"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_horizontal|top"
+        android:layout_marginStart="6dp"
+        android:layout_marginEnd="6dp"
+        android:paddingBottom="6dp"
+        app:layout_anchorGravity="top"
+        android:visibility="gone"
+        tools:visibility="visible"
+        app:layout_anchor="@id/novel_chapters_bottom_sheet">
+
+        <include layout="@layout/novel_reader_nav"
+            android:id="@+id/novel_reader_nav" />
+    </FrameLayout>
+    -->
+
+    <!-- Bottom sheet with chapters list and action icons (manga-style) -->
+    <include layout="@layout/novel_reader_chapters_sheet"
+        android:id="@+id/novel_chapters_bottom_sheet" />
+
+    <!-- Brightness overlay (for brightness control) -->
+    <View
+        android:id="@+id/brightness_overlay"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:visibility="gone" />
+
+</androidx.coordinatorlayout.widget.CoordinatorLayout>

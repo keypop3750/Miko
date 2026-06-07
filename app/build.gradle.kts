@@ -152,6 +152,7 @@ dependencies {
     implementation(projects.i18n)
     implementation(projects.presentation.core)
     implementation(projects.source.api)
+    implementation(projects.source.novel)
 
     // Compose
     implementation(platform(compose.bom))
@@ -163,6 +164,10 @@ dependencies {
     implementation(libs.flexbox)
 
     implementation(libs.material)
+    
+    // CardStackView for Swipes feature (Tinder-style swipe cards)
+    // Using jitpack repository
+    implementation("com.github.yuyakaido:CardStackView:v2.3.4")
 
     // Android X libraries
     implementation(androidx.bundles.androidx)
@@ -201,6 +206,8 @@ dependencies {
 
     // Database
     implementation(libs.sqlite.android)
+    implementation(androidx.sqlite)
+    implementation(libs.sqlite.framework)
     implementation(libs.bundles.sqlite)
 
     // Model View Presenter
@@ -228,11 +235,15 @@ dependencies {
     implementation(libs.viewstatepageradapter)
     implementation(libs.slice)
     implementation(libs.markwon)
+    implementation("io.noties.markwon:html:4.6.2")  // HTML plugin for novel paragraph parsing
 
     implementation(libs.photoview)
     implementation(libs.directionalviewpager)
     implementation(libs.viewtooltip)
     implementation(libs.taptargetview)
+
+    // Swipes Feature - CardStackView for Tinder-style card swiping
+    implementation("com.github.yuyakaido:CardStackView:v2.3.4")
 
     // Navigation
     implementation(libs.bundles.voyager)

@@ -1,0 +1,140 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    MangaDetailsActivity Layout
+    
+    Activity-optimized layout for standalone manga details screen.
+    Key differences from controller version:
+    - AppBarLayout is VISIBLE by default (not gone)
+    - Toolbar has proper theming and elevation
+    - Designed for Activity lifecycle (not Controller)
+    - No dynamic toolbar show/hide via visibility
+    - Uses scroll behavior for collapsing effects
+-->
+<androidx.coordinatorlayout.widget.CoordinatorLayout 
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/manga_frame_layout"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="?attr/background">
+
+    <!-- SwipeRefreshLayout for pull-to-refresh manga data -->
+    <!-- Content draws behind system bars, no appbar_scrolling_view_behavior needed -->
+    <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+        android:id="@+id/swipe_refresh"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="?attr/background">
+
+        <androidx.constraintlayout.widget.ConstraintLayout
+            android:id="@+id/linear_recycler_layout"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="horizontal">
+
+            <!-- Tablet Mode: Left pane (manga header) -->
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/tablet_recycler"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:clipToPadding="false"
+                android:visibility="gone"
+                app:layout_constraintTop_toTopOf="parent"
+                app:layout_constraintBottom_toBottomOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintEnd_toStartOf="@id/tablet_divider"
+                tools:itemCount="1"
+                tools:listitem="@layout/manga_header_item" />
+
+            <!-- Main RecyclerView: Manga header + chapters list -->
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/recycler"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:clipToPadding="false"
+                app:layout_constraintTop_toTopOf="parent"
+                app:layout_constraintBottom_toBottomOf="parent"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintStart_toEndOf="@id/tablet_divider"
+                tools:listitem="@layout/chapters_item" />
+
+            <!-- Tablet Mode: Top overlay for gradient effect -->
+            <View
+                android:id="@+id/tablet_overlay"
+                android:visibility="gone"
+                android:background="?attr/background"
+                android:alpha=".80"
+                android:layout_width="0dp"
+                android:layout_height="20dp"
+                app:layout_constraintStart_toStartOf="@id/recycler"
+                app:layout_constraintTop_toTopOf="parent"
+                app:layout_constraintEnd_toEndOf="parent" />
+
+            <!-- Tablet Mode: Divider between left and right panes -->
+            <View
+                android:id="@+id/tablet_divider"
+                android:layout_width="1dp"
+                android:visibility="gone"
+                android:layout_height="match_parent"
+                android:background="@color/divider"
+                app:layout_constraintStart_toEndOf="@id/tablet_recycler"
+                app:layout_constraintEnd_toStartOf="@id/recycler"
+                app:layout_constraintTop_toTopOf="parent"
+                app:layout_constraintBottom_toBottomOf="parent" />
+
+        </androidx.constraintlayout.widget.ConstraintLayout>
+
+    </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
+
+    <!-- AppBarLayout - Positioned AFTER content to draw on top -->
+    <!-- Transparent to allow backdrop to show through -->
+    <com.google.android.material.appbar.AppBarLayout
+        android:id="@+id/app_bar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@android:color/transparent"
+        android:theme="@style/ThemeOverlay.Material3.Dark.ActionBar"
+        android:elevation="5dp"
+        android:translationZ="5dp"
+        app:elevation="5dp">
+
+        <com.google.android.material.appbar.MaterialToolbar
+            android:id="@+id/toolbar"
+            android:layout_width="match_parent"
+            android:layout_height="?attr/actionBarSize"
+            android:background="@android:color/transparent"
+            app:navigationIcon="?attr/homeAsUpIndicator"
+            app:title="@null"
+            app:titleTextColor="?attr/colorOnSurface" />
+
+    </com.google.android.material.appbar.AppBarLayout>
+
+    <!-- Fast scroll indicator -->
+    <eu.kanade.tachiyomi.ui.base.MaterialFastScroll
+        android:id="@+id/fast_scroller"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        app:fastScrollerBubbleEnabled="true" />
+
+    <!-- Touch interceptor view -->
+    <View
+        android:id="@+id/touch_view"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+
+    <!-- Full-screen manga cover (shown when tapping cover image) -->
+    <com.google.android.material.imageview.ShapeableImageView
+        android:id="@+id/manga_cover_full"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_marginStart="16dp"
+        android:layout_marginTop="16dp"
+        android:layout_marginEnd="16dp"
+        android:layout_marginBottom="16dp"
+        android:contentDescription="@string/cover_of_image"
+        android:elevation="10dp"
+        android:translationZ="20dp"
+        android:visibility="invisible" />
+
+</androidx.coordinatorlayout.widget.CoordinatorLayout>

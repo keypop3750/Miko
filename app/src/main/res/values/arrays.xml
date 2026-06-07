@@ -152,4 +152,11 @@
         <item>@string/clean_read_manga_not_in_library</item>
     </string-array>
 
+    <string-array name="text_alignment_options">
+        <item>Left</item>
+        <item>Center</item>
+        <item>Justify</item>
+        <item>Right</item>
+    </string-array>
+
 </resources>

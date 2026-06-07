@@ -3,14 +3,18 @@ package eu.kanade.tachiyomi.ui.source
 import android.content.res.ColorStateList
 import android.view.View
 import androidx.core.view.isVisible
+import coil3.load
 import eu.kanade.tachiyomi.R
 import yokai.i18n.MR
 import yokai.util.lang.getString
 import dev.icerock.moko.resources.compose.stringResource
+import eu.kanade.tachiyomi.data.coil.CoverViewTarget
 import eu.kanade.tachiyomi.databinding.SourceItemBinding
 import eu.kanade.tachiyomi.source.LocalSource
 import eu.kanade.tachiyomi.source.icon
+import eu.kanade.tachiyomi.source.iconUrl
 import eu.kanade.tachiyomi.source.includeLangInName
+import eu.kanade.tachiyomi.source.isNovelSource
 import eu.kanade.tachiyomi.ui.base.holder.BaseFlexibleViewHolder
 import eu.kanade.tachiyomi.util.system.getResourceColor
 import eu.kanade.tachiyomi.util.view.compatToolTipText
@@ -63,10 +67,30 @@ class SourceHolder(view: View, val adapter: SourceAdapter) :
 
         // Set circle letter image.
         itemView.post {
-            val icon = source.icon()
             when {
-                icon != null -> binding.sourceImage.setImageDrawable(icon)
-                item.source.id == LocalSource.ID -> binding.sourceImage.setImageResource(R.mipmap.ic_local_source)
+                // For novel sources, prefer URL-based icon loading (works for private extensions)
+                source.isNovelSource() -> {
+                    val iconUrlValue = source.iconUrl()
+                    if (!iconUrlValue.isNullOrEmpty()) {
+                        binding.sourceImage.load(iconUrlValue) {
+                            target(CoverViewTarget(binding.sourceImage))
+                        }
+                    } else {
+                        // Fallback to drawable icon if no URL
+                        val icon = source.icon()
+                        if (icon != null) {
+                            binding.sourceImage.setImageDrawable(icon)
+                        }
+                    }
+                }
+                // For manga sources, use traditional drawable icon
+                else -> {
+                    val icon = source.icon()
+                    when {
+                        icon != null -> binding.sourceImage.setImageDrawable(icon)
+                        item.source.id == LocalSource.ID -> binding.sourceImage.setImageResource(R.mipmap.ic_local_source)
+                    }
+                }
             }
         }
 

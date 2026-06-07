@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="utf-8"?>
+<eu.kanade.tachiyomi.ui.swipes.SwipesSourcesView
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <LinearLayout
+        android:id="@+id/sources_layout"
+        style="@style/BottomSheetDialogTheme"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp"
+        android:orientation="vertical"
+        android:background="@android:color/transparent">
+
+        <!-- Sources Header -->
+        <TextView
+            android:id="@+id/sources_header"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:layout_marginBottom="8dp"
+            android:text="@string/sources"
+            android:textAppearance="?attr/textAppearanceHeadline6"
+            android:textColor="?attr/colorOnSurface" />
+
+        <!-- Sources RecyclerView -->
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/sources_recycler"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:maxHeight="200dp"
+            android:scrollbars="vertical" />
+
+        <!-- Spacer -->
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="16dp" />
+
+        <!-- Action Buttons -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="end">
+
+            <Button
+                android:id="@+id/close_button"
+                style="@style/Widget.Material3.Button.TextButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="8dp"
+                android:text="@string/close" />
+
+            <Button
+                android:id="@+id/reset_button"  
+                style="@style/Widget.Material3.Button.TextButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="8dp"
+                android:text="@string/reset" />
+
+            <Button
+                android:id="@+id/apply_button"
+                style="@style/Widget.Material3.Button"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/apply" />
+
+        </LinearLayout>
+
+    </LinearLayout>
+
+</eu.kanade.tachiyomi.ui.swipes.SwipesSourcesView>

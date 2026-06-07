@@ -18,6 +18,9 @@ class MangaRepositoryImpl(private val handler: DatabaseHandler) : MangaRepositor
     override suspend fun getMangaByUrlAndSource(url: String, source: Long): Manga? =
         handler.awaitFirstOrNull { mangasQueries.findByUrlAndSource(url, source, Manga::mapper) }
 
+    override suspend fun getMangasBySource(source: Long): List<Manga> =
+        handler.awaitList { mangasQueries.findBySource(source, Manga::mapper) }
+
     override suspend fun getMangaById(id: Long): Manga? =
         handler.awaitOneOrNull { mangasQueries.findById(id, Manga::mapper) }
 
@@ -117,19 +120,21 @@ class MangaRepositoryImpl(private val handler: DatabaseHandler) : MangaRepositor
             mangasQueries.selectLastInsertedRowId()
         }
 
-    override suspend fun setCategories(mangaId: Long, categoryIds: List<Long>) =
+    override suspend fun setCategories(mangaId: Long, categoryIds: List<Long>) {
         handler.await(inTransaction = true) {
             mangas_categoriesQueries.delete(mangaId)
             categoryIds.forEach { id ->
                 mangas_categoriesQueries.insert(mangaId, id)
             }
         }
+    }
 
-    override suspend fun setMultipleMangaCategories(mangaIds: List<Long>, mangaCategories: List<MangaCategory>) =
+    override suspend fun setMultipleMangaCategories(mangaIds: List<Long>, mangaCategories: List<MangaCategory>) {
         handler.await(inTransaction = true) {
             mangas_categoriesQueries.deleteBulk(mangaIds)
             mangaCategories.forEach {
                 mangas_categoriesQueries.insert(it.manga_id, it.category_id.toLong())
             }
         }
+    }
 }

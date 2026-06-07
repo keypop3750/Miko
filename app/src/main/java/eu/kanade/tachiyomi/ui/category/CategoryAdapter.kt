@@ -15,17 +15,6 @@ class CategoryAdapter(controller: CategoryController) :
      */
     val categoryItemListener: CategoryItemListener = controller
 
-    /**
-     * Clears the active selections from the model.
-     */
-    fun resetEditing(position: Int) {
-        for (i in 0..itemCount) {
-            getItem(i)?.isEditing = false
-        }
-        getItem(position)?.isEditing = true
-        notifyDataSetChanged()
-    }
-
     interface CategoryItemListener {
         /**
          * Called when an item of the list is released.
@@ -33,5 +22,6 @@ class CategoryAdapter(controller: CategoryController) :
         fun onItemReleased(position: Int)
         fun onCategoryRename(position: Int, newName: String): Boolean
         fun onItemDelete(position: Int)
+        fun onCategoryEdit(position: Int)
     }
 }

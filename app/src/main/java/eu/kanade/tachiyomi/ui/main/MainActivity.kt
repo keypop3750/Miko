@@ -86,8 +86,8 @@ import eu.kanade.tachiyomi.ui.base.activity.BaseActivity
 import eu.kanade.tachiyomi.ui.base.controller.BaseLegacyController
 import eu.kanade.tachiyomi.ui.base.controller.DialogController
 import eu.kanade.tachiyomi.ui.library.LibraryController
-import eu.kanade.tachiyomi.ui.library.compose.LibraryComposeController
 import eu.kanade.tachiyomi.ui.manga.MangaDetailsController
+import eu.kanade.tachiyomi.ui.migration.manga.design.PreMigrationController
 import eu.kanade.tachiyomi.ui.more.AboutController
 import eu.kanade.tachiyomi.ui.more.OverflowDialog
 import eu.kanade.tachiyomi.ui.more.stats.StatsController
@@ -101,6 +101,7 @@ import eu.kanade.tachiyomi.ui.source.BrowseController
 import eu.kanade.tachiyomi.ui.source.browse.BrowseSourceController
 import eu.kanade.tachiyomi.ui.source.globalsearch.GlobalSearchController
 import eu.kanade.tachiyomi.util.manga.MangaCoverMetadata
+import eu.kanade.tachiyomi.util.novel.NovelCoverMetadata
 import eu.kanade.tachiyomi.util.manga.MangaShortcutManager
 import eu.kanade.tachiyomi.util.showNotificationPermissionPrompt
 import eu.kanade.tachiyomi.util.system.contextCompatDrawable
@@ -110,6 +111,7 @@ import eu.kanade.tachiyomi.util.system.getResourceColor
 import eu.kanade.tachiyomi.util.system.hasSideNavBar
 import eu.kanade.tachiyomi.util.system.ignoredSystemInsets
 import eu.kanade.tachiyomi.util.system.isBottomTappable
+import eu.kanade.tachiyomi.util.system.isDarkMode
 import eu.kanade.tachiyomi.util.system.isInNightMode
 import eu.kanade.tachiyomi.util.system.launchIO
 import eu.kanade.tachiyomi.util.system.launchUI
@@ -144,13 +146,32 @@ import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import uy.kohesive.injekt.injectLazy
 import yokai.core.migration.Migrator
+import yokai.core.content.ContentType
+import yokai.core.mode.ModeManager
 import yokai.domain.base.BasePreferences
 import yokai.domain.recents.interactor.GetRecents
 import yokai.i18n.MR
 import yokai.presentation.core.Constants
 import yokai.presentation.extension.repo.ExtensionRepoController
 import yokai.presentation.onboarding.OnboardingController
+import yokai.presentation.component.UnifiedSearchBar
+import yokai.presentation.component.UnifiedSearchBarState
+import yokai.presentation.component.SearchBarContext
+import yokai.presentation.component.FilterToggleState
+import yokai.presentation.theme.YokaiTheme
 import yokai.util.lang.getString
+import eu.kanade.tachiyomi.util.mode.ModeCoordinator
+import eu.kanade.tachiyomi.util.mode.ModeChangeEvent
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.platform.ViewCompositionStrategy
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.ui.Modifier
 import android.R as AR
 
 @SuppressLint("ResourceType")
@@ -177,6 +198,12 @@ open class MainActivity : BaseActivity<MainActivityBinding>() {
         get() = router.backstackSize > 1 && router.backstack[1].controller !is DialogController
     private val hideAppBar
         get() = router.isCompose
+    
+    /**
+     * Unified search bar state shared between Library and Browse screens.
+     * This allows the Compose search bar to persist when navigating between screens.
+     */
+    val unifiedSearchBarState = UnifiedSearchBarState()
 
     private val updateChecker by lazy { AppUpdateChecker() }
     private val isUpdaterEnabled = BuildConfig.INCLUDE_UPDATER
@@ -372,6 +399,8 @@ open class MainActivity : BaseActivity<MainActivityBinding>() {
         binding = MainActivityBinding.inflate(layoutInflater)
 
         setContentView(binding.root)
+        
+        // Unified Compose search bar disabled - using traditional app bar
 
         binding.toolbar.overflowIcon?.setTint(getResourceColor(R.attr.actionBarTintColor))
 
@@ -411,7 +440,7 @@ open class MainActivity : BaseActivity<MainActivityBinding>() {
                 }
                 BasePreferences.LongTapRecents.LAST_READ -> {
                     lifecycleScope.launchUI {
-                        val lastReadChapter = getRecents.awaitUngrouped(true, true, "", 0).maxByOrNull { it.history.last_read }
+                        val lastReadChapter = getRecents.awaitUngrouped(true, true, "", 0, ModeManager.currentMode.value).maxByOrNull { it.history.last_read }
                         lastReadChapter ?: return@launchUI
 
                         val manga = lastReadChapter.manga
@@ -518,6 +547,7 @@ open class MainActivity : BaseActivity<MainActivityBinding>() {
                 when (router.backstack.firstOrNull()?.controller) {
                     is RecentsController -> R.id.nav_recents
                     is BrowseController -> R.id.nav_browse
+                    is eu.kanade.tachiyomi.ui.swipes.SwipesController -> R.id.nav_swipes
                     else -> R.id.nav_library
                 }
         }
@@ -537,10 +567,17 @@ open class MainActivity : BaseActivity<MainActivityBinding>() {
             continueSwitchingTabs = false
             val currentRoot = router.backstack.firstOrNull()
             if (currentRoot?.tag()?.toIntOrNull() != id) {
+                // LEGACY: Activity-based swipes (commented out - now using Controller)
+                // if (id == R.id.nav_swipes) {
+                //     val intent = android.content.Intent(this, eu.kanade.tachiyomi.ui.swipes.SwipesActivity::class.java)
+                //     startActivity(intent)
+                //     return@setOnItemSelectedListener false
+                // }
                 setRoot(
                     when (id) {
-                        R.id.nav_library -> if (basePreferences.composeLibrary().get()) LibraryComposeController() else LibraryController()
+                        R.id.nav_library -> LibraryController()
                         R.id.nav_recents -> RecentsController()
+                        R.id.nav_swipes -> eu.kanade.tachiyomi.ui.swipes.SwipesController()
                         else -> BrowseController()
                     },
                     id,
@@ -715,6 +752,12 @@ open class MainActivity : BaseActivity<MainActivityBinding>() {
         lifecycleScope.launchIO {
             extensionManager.getExtensionUpdates(true)
         }
+
+        // Observe mode changes for theme switching
+        setupModeThemeObserver()
+        
+        // Restore state after mode change recreate
+        restoreStateAfterRecreate()
 
         preferences.extensionUpdatesCount()
             .changesIn(lifecycleScope) {
@@ -946,6 +989,216 @@ open class MainActivity : BaseActivity<MainActivityBinding>() {
         }
     }
 
+    /**
+     * Track the last known mode for theme change detection.
+     */
+    private var lastThemeMode: ContentType? = null
+    
+    /** The centralized mode coordinator for optimized mode switching */
+    private val modeCoordinator by lazy { ModeCoordinator.getInstance(this) }
+    
+    /**
+     * Setup observer for mode changes to switch themes.
+     * Uses ModeCoordinator for debouncing. Compose handles theme updates reactively.
+     * When switching between manga and novel modes, the app theme changes instantly.
+     */
+    private fun setupModeThemeObserver() {
+        // Use ModeCoordinator for debounced, optimized mode changes
+        modeCoordinator.modeChangeEvents
+            .onEach { event ->
+                handleModeChangeEvent(event)
+            }
+            .launchIn(lifecycleScope)
+        
+        // Also track direct mode changes for UI updates that don't need recreate
+        ModeManager.currentMode
+            .onEach { newMode ->
+                lastThemeMode = newMode
+            }
+            .launchIn(lifecycleScope)
+    }
+    
+    /**
+     * Handle a mode change event from the coordinator.
+     * This is called after debouncing and theme comparison.
+     * Compose UI and status bar update reactively via YokaiTheme.
+     */
+    private fun handleModeChangeEvent(event: ModeChangeEvent) {
+        // Check if this event should be handled (not a stale replay)
+        if (!modeCoordinator.shouldHandleEvent(event)) {
+            return
+        }
+        
+        // Mark this event as handled to prevent re-processing
+        modeCoordinator.markEventHandled(event)
+        
+        // If themes differ, we need to recreate the activity for proper View color refresh
+        if (event.requiresRecreate) {
+            Logger.d { "🔄 [MAIN_ACTIVITY] Themes differ, recreating activity for proper color refresh" }
+            
+            // Save state before recreate (minimal state for now)
+            modeCoordinator.saveStateBeforeRecreate()
+            modeCoordinator.markRecreateStarted()
+            
+            // Recreate the activity - this will properly apply the new theme
+            recreate()
+            return
+        }
+        
+        // Apply theme change directly without recreation (themes are same or similar)
+        // Compose UI updates reactively via ModeManager.currentMode observation
+        // Status bar is updated by YokaiTheme's SideEffect
+        
+        // Apply the new theme overlay first
+        modeCoordinator.applyThemeOverlay(this, event.newMode)
+        
+        // Update View-based UI colors (toolbar card, bottom nav, etc.)
+        refreshViewColorsForMode()
+        
+        // Notify controllers of mode change
+        notifyControllersOfModeChange(event.newMode)
+    }
+    
+    /**
+     * Notify controllers that mode has changed so they can update their content.
+     * Controllers use filtering/visibility toggling, not rebuilding.
+     */
+    private fun notifyControllersOfModeChange(newMode: ContentType) {
+        // Apply any mode-specific overlays
+        modeCoordinator.applyThemeOverlay(this, newMode)
+        
+        // Refresh View-based UI colors to match new theme
+        refreshViewColorsForMode()
+        
+        // Controllers will automatically react to ModeManager.currentMode changes
+        // via their own observers. The mode change is already propagated.
+        Logger.d { "🔄 [MAIN_ACTIVITY] Mode change complete: $newMode" }
+    }
+    
+    /**
+     * Refresh View-based UI component colors after theme overlay is applied.
+     * This updates the toolbar card, bottom nav, and other Views that use theme colors.
+     */
+    private fun refreshViewColorsForMode() {
+        // Update toolbar card background
+        binding.cardView.setCardBackgroundColor(getResourceColor(R.attr.colorPrimaryVariant))
+        
+        // Update toolbar icons tint
+        binding.toolbar.overflowIcon?.setTint(getResourceColor(R.attr.actionBarTintColor))
+        binding.searchToolbar.setNavigationIconTint(getResourceColor(R.attr.actionBarTintColor))
+        
+        // Update toolbar title/text colors
+        binding.cardTitle.setTextColor(getResourceColor(R.attr.actionBarTintColor))
+        binding.cardSubtitle.setTextColor(getResourceColor(R.attr.actionBarTintColor))
+        binding.toolbarTitle.setTextColor(getResourceColor(R.attr.actionBarTintColor))
+        binding.bigTitle.setTextColor(getResourceColor(R.attr.actionBarTintColor))
+        
+        // Update bottom navigation - recreate color state lists from current theme
+        binding.bottomNav?.let { nav ->
+            // Background color
+            nav.setBackgroundColor(getResourceColor(R.attr.colorPrimaryVariant))
+            
+            // Icon tint with checked/unchecked states
+            val iconStates = arrayOf(
+                intArrayOf(android.R.attr.state_checked),
+                intArrayOf(-android.R.attr.state_checked)
+            )
+            val iconColors = intArrayOf(
+                getResourceColor(R.attr.colorSecondaryVariant),
+                getResourceColor(R.attr.tabBarIconInactive)
+            )
+            nav.itemIconTintList = android.content.res.ColorStateList(iconStates, iconColors)
+            
+            // Text colors with checked/unchecked states
+            val textColors = intArrayOf(
+                getResourceColor(R.attr.colorSecondaryVariant),
+                getResourceColor(R.attr.tabBarIconInactive)
+            )
+            nav.itemTextColor = android.content.res.ColorStateList(iconStates, textColors)
+            
+            // Active indicator color
+            nav.itemActiveIndicatorColor = android.content.res.ColorStateList.valueOf(
+                getResourceColor(R.attr.colorSecondary).let { color ->
+                    android.graphics.Color.argb(
+                        40,
+                        android.graphics.Color.red(color),
+                        android.graphics.Color.green(color),
+                        android.graphics.Color.blue(color)
+                    )
+                }
+            )
+        }
+        
+        // Update status bar color to match new theme
+        window?.statusBarColor = getResourceColor(android.R.attr.statusBarColor)
+        
+        // Update navigation bar color
+        window?.navigationBarColor = getResourceColor(R.attr.colorPrimaryVariant)
+        
+        Logger.d { "🎨 [MAIN_ACTIVITY] Refreshed View colors for current mode" }
+    }
+    
+    /**
+     * Setup the unified Compose search bar - DISABLED.
+     * Using traditional View-based app bar instead.
+     */
+    private fun setupUnifiedComposeSearchBar() {
+        // Disabled - Compose search bar removed from layout
+    }
+    
+    /**
+     * Enable the unified Compose search bar for the current screen.
+     * DISABLED - Using traditional app bar instead.
+     */
+    fun enableUnifiedSearchBar(
+        context: SearchBarContext,
+        title: String,
+        subtitle: String? = null,
+    ) {
+        // Disabled - Compose search bar removed
+    }
+    
+    /**
+     * Disable the unified Compose search bar.
+     * DISABLED - Using traditional app bar instead.
+     */
+    fun disableUnifiedSearchBar(showOldAppBar: Boolean = true) {
+        // Disabled - Compose search bar removed
+        if (showOldAppBar) {
+            binding.appBar.isVisible = true
+        }
+    }
+    
+    /**
+     * Restore controller state after activity recreate.
+     * This provides seamless mode switching by preserving scroll positions and tab state.
+     */
+    private fun restoreStateAfterRecreate() {
+        // Mark recreate as complete so we can process new events
+        modeCoordinator.markRecreateComplete()
+        
+        // Continue any pending theme transition animation
+        eu.kanade.tachiyomi.util.view.ThemeTransitionHelper.continuePendingTransition(this)
+        
+        val restoredState = modeCoordinator.restoreStateAfterRecreate() ?: return
+        
+        // Restore after a short delay to let the UI settle
+        lifecycleScope.launchUI {
+            delay(100)
+            
+            // Restore library scroll position if applicable
+            restoredState.scrollPositions["library"]?.let { position ->
+                router.backstack.lastOrNull()?.controller?.let { controller ->
+                    if (controller is LibraryController) {
+                        controller.mainRecyclerView?.let { rv ->
+                            (rv.layoutManager as? androidx.recyclerview.widget.LinearLayoutManager)?.scrollToPosition(position)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     override fun onResume() {
         super.onResume()
         checkForAppUpdates()
@@ -999,6 +1252,7 @@ open class MainActivity : BaseActivity<MainActivityBinding>() {
     private fun saveExtras() {
         mangaShortcutManager.updateShortcuts(this)
         MangaCoverMetadata.savePrefs()
+        NovelCoverMetadata.savePrefs()
     }
 
     private fun checkForAppUpdates() {
@@ -1053,6 +1307,19 @@ open class MainActivity : BaseActivity<MainActivityBinding>() {
                 intent.getIntExtra("groupId", 0),
             )
         }
+        
+        // Handle tab selection from SwipesActivity
+        val selectedTab = intent.getIntExtra(EXTRA_SELECTED_TAB, -1)
+        if (selectedTab != -1) {
+            nav.selectedItemId = selectedTab
+            // Handle search trigger if requested
+            if (intent.getBooleanExtra(EXTRA_OPEN_SEARCH, false)) {
+                // TODO: Trigger search expansion when browse tab is selected
+                // This will be implemented in Phase 4 (Advanced Features & Filtering)
+            }
+            return true
+        }
+        
         when (intent.action) {
             SHORTCUT_LIBRARY -> nav.selectedItemId = R.id.nav_library
             SHORTCUT_RECENTLY_UPDATED, SHORTCUT_RECENTLY_READ, Constants.SHORTCUT_RECENTS -> {
@@ -1106,6 +1373,17 @@ open class MainActivity : BaseActivity<MainActivityBinding>() {
                 val extras = intent.extras ?: return false
                 if (router.backstack.isEmpty()) nav.selectedItemId = R.id.nav_library
                 router.pushController(BrowseSourceController(extras).withFadeTransaction())
+            }
+            SHORTCUT_MIGRATE -> {
+                val extras = intent.extras ?: return false
+                val mangaId = extras.getLong("manga_id", -1L)
+                if (mangaId == -1L) return false
+                if (router.backstack.isEmpty()) nav.selectedItemId = R.id.nav_library
+                PreMigrationController.navigateToMigration(
+                    preferences.skipPreMigration().get(),
+                    router,
+                    listOf(mangaId)
+                )
             }
             SHORTCUT_DOWNLOADS -> {
                 nav.selectedItemId = R.id.nav_recents
@@ -1200,6 +1478,13 @@ open class MainActivity : BaseActivity<MainActivityBinding>() {
 
     protected val nav: NavigationBarView
         get() = binding.bottomNav ?: binding.sideNav!!
+
+    /**
+     * Public accessor for bottom navigation view.
+     * Used by BrowseController for synchronized nav bar + extension button animations.
+     */
+    val bottomNavView: View?
+        get() = binding.bottomNav
 
     private fun setStartingTab() {
         if (this is SearchActivity || !isBindingInitialized) return
@@ -1381,6 +1666,23 @@ open class MainActivity : BaseActivity<MainActivityBinding>() {
 
     fun showStats() {
         router.pushController(StatsController().withFadeTransaction())
+    }
+
+    /**
+     * Shows the overflow menu dialog from Compose components.
+     * Used by BrowseController's Compose toolbar to show the same menu as the activity toolbar.
+     */
+    fun showOverflowMenu() {
+        if (overflowDialog != null) return
+        val dialog = OverflowDialog(this)
+        this.overflowDialog = dialog
+        dialog.blurBehindWindow(
+            window,
+            onDismiss = {
+                this.overflowDialog = null
+            },
+        )
+        dialog.show()
     }
 
     override fun dispatchTouchEvent(ev: MotionEvent?): Boolean {
@@ -1624,13 +1926,62 @@ open class MainActivity : BaseActivity<MainActivityBinding>() {
         const val SHORTCUT_SOURCE = "eu.kanade.tachiyomi.SHOW_SOURCE"
         const val SHORTCUT_READER_SETTINGS = "eu.kanade.tachiyomi.READER_SETTINGS"
         const val SHORTCUT_EXTENSIONS = "eu.kanade.tachiyomi.EXTENSIONS"
+        const val SHORTCUT_MIGRATE = "eu.kanade.tachiyomi.MIGRATE"
 
         const val INTENT_SEARCH = "eu.kanade.tachiyomi.SEARCH"
         const val INTENT_SEARCH_QUERY = "query"
         const val INTENT_SEARCH_FILTER = "filter"
+        
+        // Swipes integration extras
+        const val EXTRA_SELECTED_TAB = "selected_tab"
+        const val EXTRA_OPEN_SEARCH = "open_search"
 
         var chapterIdToExitTo = 0L
         var backVelocity = 0f
+        
+        /**
+         * Create intent for MainActivity with optional tab selection.
+         * Used by SwipesActivity to return to MainActivity with specific tab.
+         */
+        fun newIntent(context: Context): Intent {
+            return Intent(context, MainActivity::class.java)
+        }
+    }
+
+    /**
+     * Animates bottom navigation bar sliding off screen and disables interaction.
+     * Used for morph-in-place source transition.
+     * 
+     * @param duration Animation duration in milliseconds
+     */
+    fun animateBottomNavOut(duration: Long) {
+        val navView = nav
+        navView.animate()
+            .translationY(navView.height.toFloat())
+            .alpha(0f)
+            .setDuration(duration)
+            .withStartAction {
+                navView.isEnabled = false
+            }
+            .start()
+    }
+
+    /**
+     * Animates bottom navigation bar sliding back on screen and re-enables interaction.
+     * Used for reverse morph transition (back to browse).
+     * 
+     * @param duration Animation duration in milliseconds
+     */
+    fun animateBottomNavIn(duration: Long) {
+        val navView = nav
+        navView.animate()
+            .translationY(0f)
+            .alpha(1f)
+            .setDuration(duration)
+            .withEndAction {
+                navView.isEnabled = true
+            }
+            .start()
     }
 }
 

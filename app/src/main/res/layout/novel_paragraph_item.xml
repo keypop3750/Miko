@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 
+    Novel paragraph item layout for RecyclerView.
+    KEY INSIGHT: The 16dp top/bottom padding creates natural paragraph spacing!
+    This is how QuickNovel achieves visible gaps - RecyclerView item margins, not HTML parsing.
+    User feedback: Increased from 8dp to 16dp for better readability.
+-->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:paddingStart="16dp"
+    android:paddingEnd="16dp"
+    android:paddingTop="16dp"
+    android:paddingBottom="16dp">
+    
+    <TextView
+        android:id="@+id/paragraph_text"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:textSize="16sp"
+        android:lineSpacingMultiplier="1.5"
+        android:textIsSelectable="true"
+        tools:text="This is a paragraph of novel text. It will have proper spacing above and below thanks to the FrameLayout padding." />
+    
+</FrameLayout>

@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:padding="16dp"
+    android:background="?attr/selectableItemBackground">
+
+    <!-- Manga Cover -->
+    <ImageView
+        android:id="@+id/manga_cover"
+        android:layout_width="56dp"
+        android:layout_height="80dp"
+        android:scaleType="centerCrop"
+        android:contentDescription="@string/cover_of_image"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent"
+        tools:src="@mipmap/ic_launcher" />
+
+    <!-- Swipe Direction Icon (Right side) -->
+    <ImageView
+        android:id="@+id/swipe_direction_icon"
+        android:layout_width="24dp"
+        android:layout_height="24dp"
+        android:layout_marginEnd="8dp"
+        android:contentDescription="Swipe direction"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:tint="?attr/colorPrimary"
+        tools:src="@drawable/ic_arrow_forward_24dp" />
+
+    <!-- Manga Title -->
+    <TextView
+        android:id="@+id/manga_title"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="12dp"
+        android:layout_marginEnd="8dp"
+        android:ellipsize="end"
+        android:maxLines="2"
+        android:textAppearance="@style/TextAppearance.Material3.BodyLarge"
+        android:textColor="?attr/colorOnSurface"
+        app:layout_constraintTop_toTopOf="@id/manga_cover"
+        app:layout_constraintStart_toEndOf="@id/manga_cover"
+        app:layout_constraintEnd_toStartOf="@id/swipe_direction_icon"
+        tools:text="A Wonderful New World" />
+
+    <!-- Manga Author -->
+    <TextView
+        android:id="@+id/manga_author"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="12dp"
+        android:layout_marginEnd="8dp"
+        android:layout_marginTop="4dp"
+        android:ellipsize="end"
+        android:maxLines="1"
+        android:textAppearance="@style/TextAppearance.Material3.BodySmall"
+        android:textColor="?attr/colorOnSurfaceVariant"
+        app:layout_constraintTop_toBottomOf="@id/manga_title"
+        app:layout_constraintStart_toEndOf="@id/manga_cover"
+        app:layout_constraintEnd_toStartOf="@id/swipe_direction_icon"
+        tools:text="Unknown • 202 chapters" />
+
+    <!-- Timestamp -->
+    <TextView
+        android:id="@+id/timestamp"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="12dp"
+        android:layout_marginEnd="8dp"
+        android:layout_marginTop="4dp"
+        android:textAppearance="@style/TextAppearance.Material3.LabelSmall"
+        android:textColor="?attr/colorOnSurfaceVariant"
+        app:layout_constraintTop_toBottomOf="@id/manga_author"
+        app:layout_constraintStart_toEndOf="@id/manga_cover"
+        app:layout_constraintEnd_toStartOf="@id/swipe_direction_icon"
+        app:layout_constraintBottom_toBottomOf="@id/manga_cover"
+        tools:text="2 hours ago" />
+
+</androidx.constraintlayout.widget.ConstraintLayout>

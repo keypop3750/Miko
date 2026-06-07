@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Navigation button using default Material3 button style (matches Continue Reading button in novel details) -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:paddingStart="16dp"
+    android:paddingEnd="16dp"
+    android:paddingTop="8dp"
+    android:paddingBottom="8dp">
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/navigation_button"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Previous Chapter"
+        android:textSize="16sp"
+        app:cornerRadius="24dp" />
+
+</FrameLayout>

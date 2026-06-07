@@ -9,7 +9,7 @@
     app:strokeWidth="0dp"
     android:layout_marginEnd="20dp"
     android:layout_marginBottom="6dp"
-    app:cardCornerRadius="18dp"
+    app:cardCornerRadius="14dp"
     app:cardElevation="6dp">
 
     <androidx.constraintlayout.widget.ConstraintLayout
@@ -27,7 +27,7 @@
             android:layout_height="wrap_content"
             android:layout_marginEnd="4dp"
             android:contentDescription="@string/previous_title"
-            android:padding="12dp"
+            android:padding="8dp"
             android:src="@drawable/ic_expand_less_24dp"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintEnd_toStartOf="@id/category_button"
@@ -40,7 +40,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:contentDescription="@string/categories"
-            android:padding="12dp"
+            android:padding="8dp"
             android:src="@drawable/ic_label_outline_24dp"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintEnd_toStartOf="@id/down_category"
@@ -54,7 +54,7 @@
             android:layout_height="wrap_content"
             android:layout_marginStart="4dp"
             android:contentDescription="@string/next_title"
-            android:padding="12dp"
+            android:padding="8dp"
             android:src="@drawable/ic_expand_more_24dp"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintEnd_toEndOf="parent"

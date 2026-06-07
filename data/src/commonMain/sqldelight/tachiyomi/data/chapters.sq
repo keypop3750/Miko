@@ -85,6 +85,11 @@ AND lower(M.title) LIKE '%' || :search || '%'
 AND (
     :apply_filter = 0 OR S.name IS NULL
 )
+AND (
+    :content_type = 0 OR 
+    (:content_type = 1 AND M.source < 6000) OR 
+    (:content_type = 2 AND M.source >= 6000)
+)
 ORDER BY C.date_fetch DESC
 LIMIT :limit OFFSET :offset;
 

@@ -1,0 +1,544 @@
+package eu.kanade.tachiyomi.ui.novel.reader
+
+import android.content.Context
+import android.text.Spanned
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import io.noties.markwon.Markwon
+import io.noties.markwon.html.HtmlPlugin
+import kotlinx.coroutines.flow.MutableSharedFlow
+import org.jsoup.Jsoup
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
+import yokai.core.novel.reader.NovelReaderPreferences
+import yokai.domain.novel.Novel
+import yokai.domain.novel.NovelChapter
+import yokai.domain.novel.NovelRepository
+import yokai.domain.novel.NovelReadingPosition
+import yokai.source.novel.NovelMainAPI
+import yokai.source.novel.NovelProviderRegistry
+
+/**
+ * ViewModel for novel reading with content streaming, position tracking, and chapter navigation.
+ * Handles direct content flow from providers to reader, bypassing manga's page-based structure.
+ * 
+ * Uses Koin for constructor injection (NovelRepository) and static access for providers (QuickNovel pattern).
+ */
+class NovelReaderViewModel(
+    private val novelRepository: NovelRepository
+) : ViewModel() {
+
+    // State flows for UI
+    private val _novel = MutableStateFlow<Novel?>(null)
+    val novel: StateFlow<Novel?> = _novel.asStateFlow()
+
+    private val _currentChapter = MutableStateFlow<NovelChapter?>(null)
+    val currentChapter: StateFlow<NovelChapter?> = _currentChapter.asStateFlow()
+
+    // FIX: Start with loading message instead of empty string to prevent white flash
+    // Activity observer will show loading indicator for "Loading..." state
+    private val _chapterContent = MutableStateFlow("Loading chapter content...")
+    val chapterContent: StateFlow<String> = _chapterContent.asStateFlow()
+
+    private val _chapters = MutableStateFlow<List<NovelChapter>>(emptyList())
+    val chapters: StateFlow<List<NovelChapter>> = _chapters.asStateFlow()
+
+    private val _readerPreferences = MutableStateFlow(NovelReaderPreferences())
+    val readerPreferences: StateFlow<NovelReaderPreferences> = _readerPreferences.asStateFlow()
+
+    private val _readingProgress = MutableStateFlow(NovelReadingProgress())
+    val readingProgress: StateFlow<NovelReadingProgress> = _readingProgress.asStateFlow()
+
+    private val _uiState = MutableStateFlow(NovelReaderUiState())
+    val uiState: StateFlow<NovelReaderUiState> = _uiState.asStateFlow()
+
+    // Navigation loading states for manga-style overlay
+    private val _isLoadingPrevious = MutableStateFlow(false)
+    val isLoadingPrevious: StateFlow<Boolean> = _isLoadingPrevious.asStateFlow()
+
+    private val _isLoadingNext = MutableStateFlow(false)
+    val isLoadingNext: StateFlow<Boolean> = _isLoadingNext.asStateFlow()
+
+    // Events for one-time UI updates
+    private val _events = MutableSharedFlow<NovelReaderEvent>()
+    val events: SharedFlow<NovelReaderEvent> = _events.asSharedFlow()
+
+    // Phase 3: Content items for RecyclerView display (paragraph-level rendering)
+    private val _contentItems = MutableStateFlow<List<NovelContentItem>>(emptyList())
+    val contentItems: StateFlow<List<NovelContentItem>> = _contentItems.asStateFlow()
+
+    // Markwon instance for HTML → Spanned conversion with paragraph-level parsing
+    // Lazy initialization requires context from Activity (initContext() must be called first)
+    private var context: Context? = null
+    private val markwon: Markwon by lazy {
+        val ctx = context ?: throw IllegalStateException("Context not initialized. Call initContext() first.")
+        Markwon.builder(ctx)
+            .usePlugin(HtmlPlugin.create { plugin ->
+                plugin.excludeDefaults(false) // Keep default HTML tag handlers (p, br, b, i, etc.)
+            })
+            .build()
+    }
+
+    /**
+     * Initialize context for Markwon HTML parsing.
+     * Must be called from Activity before any chapter loading occurs.
+     * 
+     * @param ctx Application or Activity context
+     */
+    fun initContext(ctx: Context) {
+        this.context = ctx.applicationContext
+        android.util.Log.d("NovelReaderViewModel", "Context initialized for Markwon HTML parsing")
+    }
+
+    // Internal state
+    private var currentProvider: NovelMainAPI? = null
+    private var currentChapterIndex = 0
+    private var characterPosition = 0
+    private var readingStartTime = 0L
+
+    fun initialize(novelId: Long, chapterId: Long?) {
+        viewModelScope.launch {
+            try {
+                android.util.Log.d("NovelReaderViewModel", "=== initialize START ===")
+                android.util.Log.d("NovelReaderViewModel", "Novel ID: $novelId, Chapter ID: $chapterId")
+                
+                // Load novel
+                val novel = novelRepository.getNovelById(novelId)
+                if (novel == null) {
+                    android.util.Log.e("NovelReaderViewModel", "Novel not found!")
+                    _events.emit(NovelReaderEvent.ShowError("Novel not found"))
+                    return@launch
+                }
+                _novel.value = novel
+                android.util.Log.d("NovelReaderViewModel", "Novel loaded: ${novel.title}, Source: ${novel.source}")
+
+                // Get provider for content loading (static access - QuickNovel pattern)
+                // MUST be set BEFORE loading chapters so loadChapter() can use it!
+                android.util.Log.d("NovelReaderViewModel", "Getting provider for source ${novel.source}...")
+                currentProvider = NovelProviderRegistry.getProvider(novel.source)
+                if (currentProvider == null) {
+                    android.util.Log.e("NovelReaderViewModel", "Provider not found for source ${novel.source}")
+                    android.util.Log.e("NovelReaderViewModel", "Available providers: ${NovelProviderRegistry.providers.map { it.name }}")
+                    _events.emit(NovelReaderEvent.ShowError("Provider not found for source ${novel.source}. Available providers: ${NovelProviderRegistry.providers.map { it.name }}"))
+                    return@launch
+                }
+                android.util.Log.d("NovelReaderViewModel", "Provider found: ${currentProvider?.name}")
+
+                // Load chapters (use direct query for one-time loading, matching NovelDetailsPresenter pattern)
+                android.util.Log.d("NovelReaderViewModel", "Loading chapters...")
+                val chapterList = novelRepository.getChaptersByNovelIdOnce(novelId)
+                _chapters.value = chapterList.sortedBy { it.sourceOrder }
+                android.util.Log.d("NovelReaderViewModel", "Loaded ${chapterList.size} chapters")
+                android.util.Log.d("NovelReaderViewModel", "Looking for chapter with ID: $chapterId")
+                
+                // Set current chapter
+                val targetChapter = if (chapterId != null) {
+                    val found = chapterList.find { it.id == chapterId }
+                    android.util.Log.d("NovelReaderViewModel", "Searching by chapter ID: found=${found != null}")
+                    found
+                } else {
+                    // Find first unread chapter or first chapter
+                    val unread = chapterList.find { !it.read }
+                    val first = chapterList.firstOrNull()
+                    android.util.Log.d("NovelReaderViewModel", "No chapter ID specified, using first unread or first: unread=${unread != null}, first=${first != null}")
+                    unread ?: first
+                }
+                
+                if (targetChapter != null) {
+                    currentChapterIndex = _chapters.value.indexOf(targetChapter)
+                    
+                    // CRITICAL: Load saved position BEFORE loading content
+                    // This ensures shouldScrollTo flag is set before content observer runs
+                    loadSavedPosition(novelId, targetChapter.id)
+                    
+                    loadChapter(targetChapter)
+                } else {
+                    android.util.Log.e("NovelReaderViewModel", "No target chapter found - chapter list empty")
+                }
+                
+            } catch (e: Exception) {
+                android.util.Log.e("NovelReaderViewModel", "Failed to initialize reader", e)
+                _events.emit(NovelReaderEvent.ShowError("Failed to initialize: ${e.message}"))
+            }
+        }
+    }
+
+    private suspend fun loadChapter(chapter: NovelChapter) {
+        try {
+            _currentChapter.value = chapter
+            
+            // Load content from provider
+            val provider = currentProvider
+            if (provider == null) {
+                android.util.Log.e("NovelReaderViewModel", "No provider available")
+                _events.emit(NovelReaderEvent.ShowError("No provider available"))
+                return
+            }
+
+            // Show loading state
+            _chapterContent.value = "Loading chapter content..."
+            
+            // Load chapter content from novel provider
+            val novelContent = provider.getNovelChapterContent(chapter.url)
+            
+            // Phase 3: Parse HTML into paragraph items instead of setting raw HTML
+            val items = parseHtmlToParagraphs(novelContent.content, chapter.id)
+            _contentItems.value = items
+            
+            // Keep for backward compatibility during migration (Phase 3 will eventually remove)
+            _chapterContent.value = novelContent.content
+            
+            // Update UI state
+            updateUiState()
+            
+            // Mark chapter as read
+            novelRepository.markChapterRead(chapter.id, true)
+            
+            // Update reading session
+            readingStartTime = System.currentTimeMillis()
+            
+            // Emit chapter changed event
+            _events.emit(NovelReaderEvent.ChapterChanged(chapter.title))
+            
+        } catch (e: Exception) {
+            android.util.Log.e("NovelReaderViewModel", "=== loadChapter FAILED ===", e)
+            android.util.Log.e("NovelReaderViewModel", "Error message: ${e.message}")
+            android.util.Log.e("NovelReaderViewModel", "Error stack trace:", e)
+            _chapterContent.value = "Error: ${e.message}"
+            _events.emit(NovelReaderEvent.ShowError("Failed to load chapter: ${e.message}"))
+        }
+    }
+
+    private suspend fun loadSavedPosition(novelId: Long, chapterId: Long?) {
+        if (chapterId == null) {
+            android.util.Log.w("ViewModel", "Cannot load saved position - chapterId is null")
+            return
+        }
+        
+        try {
+            val savedPosition = novelRepository.getReadingPosition(novelId, chapterId)
+            
+            if (savedPosition != null) {
+                characterPosition = savedPosition.characterPosition
+                _readingProgress.value = _readingProgress.value.copy(
+                    shouldScrollTo = true,
+                    scrollPosition = savedPosition.scrollPosition
+                )
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("ViewModel", "Failed to load saved position", e)
+        }
+    }
+
+    /**
+     * Load a specific chapter by ID (from chapter list selection)
+     */
+    fun loadChapterById(chapterId: Long) {
+        val chapter = _chapters.value.find { it.id == chapterId } ?: return
+        val newIndex = _chapters.value.indexOf(chapter)
+        if (newIndex != -1) {
+            currentChapterIndex = newIndex
+            viewModelScope.launch {
+                try {
+                    loadChapter(chapter)
+                } catch (e: Exception) {
+                    android.util.Log.e("NovelReaderViewModel", "Failed to load chapter", e)
+                    _events.emit(NovelReaderEvent.ShowError("Failed to load chapter: ${e.message}"))
+                }
+            }
+        }
+    }
+
+    fun navigateToPreviousChapter() {
+        if (currentChapterIndex > 0 && !_isLoadingPrevious.value) {
+            _isLoadingPrevious.value = true
+            currentChapterIndex--
+            val chapter = _chapters.value[currentChapterIndex]
+            viewModelScope.launch {
+                try {
+                    loadChapter(chapter)
+                } finally {
+                    _isLoadingPrevious.value = false
+                }
+            }
+        }
+    }
+
+    fun navigateToNextChapter() {
+        if (currentChapterIndex < _chapters.value.size - 1 && !_isLoadingNext.value) {
+            _isLoadingNext.value = true
+            currentChapterIndex++
+            val chapter = _chapters.value[currentChapterIndex]
+            viewModelScope.launch {
+                try {
+                    loadChapter(chapter)
+                } finally {
+                    _isLoadingNext.value = false
+                }
+            }
+        }
+    }
+
+    fun toggleBookmark() {
+        val chapter = _currentChapter.value ?: return
+        viewModelScope.launch {
+            try {
+                val updatedChapter = chapter.copy(bookmark = !chapter.bookmark)
+                novelRepository.updateChapter(updatedChapter)
+                _currentChapter.value = updatedChapter
+                
+                updateUiState()
+                _events.emit(NovelReaderEvent.BookmarkToggled(updatedChapter.bookmark))
+            } catch (e: Exception) {
+                _events.emit(NovelReaderEvent.ShowError("Failed to toggle bookmark"))
+            }
+        }
+    }
+
+    fun updateScrollPosition(scrollY: Int, contentHeight: Int) {
+        // Calculate reading progress based on scroll position
+        val progress = if (contentHeight > 0) {
+            (scrollY.toFloat() / contentHeight.coerceAtLeast(1)).coerceIn(0f, 1f)
+        } else 0f
+        
+        // Estimate character position based on scroll
+        val content = _chapterContent.value
+        characterPosition = (content.length * progress).toInt().coerceIn(0, content.length)
+        
+        // Update reading progress
+        _readingProgress.value = _readingProgress.value.copy(
+            progress = progress,
+            scrollPosition = scrollY,
+            shouldScrollTo = false
+        )
+        
+        updateUiState()
+    }
+
+    fun seekToPosition(progressPercent: Float) {
+        val contentItems = _contentItems.value
+        val paragraphs = contentItems.filterIsInstance<NovelContentItem.Paragraph>()
+        
+        if (paragraphs.isEmpty()) {
+            android.util.Log.w("NovelReaderViewModel", "seekToPosition called with no paragraphs")
+            return
+        }
+        
+        // SIMPLE FIX: 100% always means absolute end of last paragraph
+        if (progressPercent >= 1.0f) {
+            val lastParagraph = paragraphs.last()
+            characterPosition = lastParagraph.endCharIndex
+            android.util.Log.d("NovelReaderViewModel", "Slider seek: 100% → absolute end (char $characterPosition)")
+            
+            _readingProgress.value = _readingProgress.value.copy(
+                progress = 1.0f,
+                scrollPosition = Int.MAX_VALUE, // Force scroll to bottom
+                shouldScrollTo = true
+            )
+            updateUiState()
+            return
+        }
+        
+        // For 0-99%: Simple linear mapping by total character count
+        val totalChars = paragraphs.last().endCharIndex
+        characterPosition = (totalChars * progressPercent).toInt().coerceIn(0, totalChars)
+        
+        android.util.Log.d("NovelReaderViewModel", "Slider seek: ${(progressPercent * 100).toInt()}% → char $characterPosition / $totalChars")
+        
+        _readingProgress.value = _readingProgress.value.copy(
+            progress = progressPercent,
+            scrollPosition = (progressPercent * 1000).toInt(),
+            shouldScrollTo = true
+        )
+        
+        updateUiState()
+    }
+
+    /**
+     * Phase 4: Update character position from RecyclerView scroll state.
+     * Called by Activity when user scrolls through content.
+     */
+    fun updateCharacterPosition(newPosition: Int) {
+        characterPosition = newPosition
+    }
+
+    /**
+     * Phase 4: Get current character position for bookmark restoration.
+     */
+    fun getCurrentCharacterPosition(): Int = characterPosition
+
+    fun saveCurrentPosition() {
+        val novel = _novel.value ?: return
+        val chapter = _currentChapter.value ?: return
+        
+        viewModelScope.launch {
+            try {
+                // Save character position and scroll position
+                novelRepository.updateReadingProgress(chapter.id, characterPosition)
+                
+                // Update reading time
+                val readingTime = System.currentTimeMillis() - readingStartTime
+                val updatedChapter = chapter.copy(
+                    lastReadPosition = characterPosition,
+                    readingTimeMs = chapter.readingTimeMs + readingTime
+                )
+                novelRepository.updateChapter(updatedChapter)
+                
+            } catch (e: Exception) {
+                // Ignore save errors
+                android.util.Log.e("NovelReaderViewModel", "Failed to save position", e)
+            }
+        }
+    }
+
+    fun updateReadingSession() {
+        readingStartTime = System.currentTimeMillis()
+    }
+
+    /**
+     * Parses HTML content into paragraph-level NovelContentItem list.
+     * Splits content by <p> tags and converts each to a Paragraph item using Markwon.
+     * 
+     * This enables RecyclerView-based rendering where each paragraph is a separate item,
+     * creating natural spacing through RecyclerView item margins (8dp top/bottom padding).
+     * 
+     * @param html Raw HTML content from provider (may contain <p>, <br>, <b>, <i>, etc.)
+     * @param chapterId Chapter identifier for the content
+     * @return List of NovelContentItem (primarily Paragraph items)
+     */
+    private fun parseHtmlToParagraphs(
+        html: String,
+        chapterId: Long
+    ): List<NovelContentItem> {
+        val items = mutableListOf<NovelContentItem>()
+        
+        try {
+            android.util.Log.d("NovelReaderViewModel", "Parsing HTML to paragraphs...")
+            android.util.Log.d("NovelReaderViewModel", "HTML length: ${html.length} chars")
+            
+            // Clean HTML with Jsoup
+            val document = Jsoup.parse(html)
+            document.select("style, script, noscript").remove() // Remove non-content elements
+            
+            // Extract paragraphs (select <p> tags)
+            val paragraphs = document.select("p")
+            android.util.Log.d("NovelReaderViewModel", "Found ${paragraphs.size} <p> tags")
+            
+            var charIndex = 0
+            
+            paragraphs.forEachIndexed { index, element ->
+                val paragraphHtml = element.html()
+                
+                // Skip empty paragraphs
+                if (paragraphHtml.isBlank()) {
+                    android.util.Log.d("NovelReaderViewModel", "Skipping empty paragraph at index $index")
+                    return@forEachIndexed
+                }
+                
+                // Convert to Spanned using Markwon (preserves formatting: bold, italic, links, etc.)
+                val spanned: Spanned = markwon.toMarkdown(paragraphHtml)
+                
+                val startChar = charIndex
+                // FIX: endChar is INCLUSIVE (last character belongs to this paragraph)
+                // Example: text.length=5 means chars 0,1,2,3,4 (endChar=4, not 5)
+                val endChar = charIndex + spanned.length - 1
+                
+                items.add(
+                    NovelContentItem.Paragraph(
+                        text = spanned,
+                        startCharIndex = startChar,
+                        endCharIndex = endChar,
+                        paragraphIndex = index,
+                        chapterId = chapterId
+                    )
+                )
+                
+                // Next paragraph starts right after this one
+                charIndex = endChar + 1
+                
+                if (index < 3) { // Log first 3 paragraphs for debugging
+                    android.util.Log.d("NovelReaderViewModel", "Paragraph $index: ${spanned.toString().take(50)}...")
+                }
+            }
+            
+            android.util.Log.d("NovelReaderViewModel", "Parsed ${items.size} paragraphs successfully")
+            
+        } catch (e: Exception) {
+            android.util.Log.e("NovelReaderViewModel", "Error parsing HTML to paragraphs", e)
+            // Return error item if parsing fails
+            items.clear()
+            items.add(
+                NovelContentItem.Error(
+                    chapterId = chapterId,
+                    errorMessage = "Failed to parse chapter content: ${e.message}",
+                    canRetry = false
+                )
+            )
+        }
+        
+        return items
+    }
+
+    private fun updateUiState() {
+        val chapters = _chapters.value
+        val currentChapter = _currentChapter.value
+        val progress = _readingProgress.value.progress
+        
+        val chapterIndex = currentChapter?.let { chapters.indexOf(it) } ?: 0
+        val totalChapters = chapters.size
+        
+        // Calculate estimated reading time
+        val content = _chapterContent.value
+        val wordsPerMinute = 200 // Average reading speed
+        val wordCount = content.split("\\s+".toRegex()).size
+        val estimatedMinutes = ((wordCount * (1 - progress)) / wordsPerMinute).toInt()
+        
+        _uiState.value = NovelReaderUiState(
+            hasPreviousChapter = chapterIndex > 0,
+            hasNextChapter = chapterIndex < totalChapters - 1,
+            isBookmarked = currentChapter?.bookmark ?: false,
+            readingProgress = progress,
+            showReadingProgress = true,
+            progressText = "Chapter ${chapterIndex + 1} of $totalChapters • ${(progress * 100).toInt()}% complete",
+            estimatedTimeText = if (estimatedMinutes > 0) "${estimatedMinutes}m left" else "Done"
+        )
+    }
+}
+
+/**
+ * UI state for the novel reader
+ */
+data class NovelReaderUiState(
+    val hasPreviousChapter: Boolean = false,
+    val hasNextChapter: Boolean = false,
+    val isBookmarked: Boolean = false,
+    val readingProgress: Float = 0f,
+    val showReadingProgress: Boolean = false,
+    val progressText: String = "",
+    val estimatedTimeText: String = ""
+)
+
+/**
+ * Reading progress tracking with character-level positions
+ */
+data class NovelReadingProgress(
+    val progress: Float = 0f,
+    val scrollPosition: Int = 0,
+    val shouldScrollTo: Boolean = false
+)
+
+/**
+ * Events for one-time UI updates
+ */
+sealed class NovelReaderEvent {
+    data class ShowError(val message: String) : NovelReaderEvent()
+    data class ChapterChanged(val chapterTitle: String) : NovelReaderEvent()
+    data class BookmarkToggled(val isBookmarked: Boolean) : NovelReaderEvent()
+}

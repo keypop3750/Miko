@@ -22,6 +22,10 @@
         android:title="@string/display_as"
         app:showAsAction="ifRoom" />
 
+    <!-- Mode toggle removed: not applicable in individual source views -->
+    <!-- Users switch content modes (manga/novel) in the main browse screen, -->
+    <!-- not when browsing a specific source -->
+
     <item
         android:id="@+id/action_open_in_web_view"
         android:icon="@drawable/ic_open_in_webview_24dp"

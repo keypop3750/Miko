@@ -3,6 +3,7 @@ package eu.kanade.tachiyomi.ui.source.browse
 import co.touchlab.kermit.Logger
 import eu.davidea.flexibleadapter.items.IFlexible
 import eu.kanade.tachiyomi.data.cache.CoverCache
+import eu.kanade.tachiyomi.data.cache.MangaEntityCache
 import eu.kanade.tachiyomi.data.database.models.create
 import eu.kanade.tachiyomi.data.database.models.removeCover
 import eu.kanade.tachiyomi.data.download.DownloadManager
@@ -31,7 +32,10 @@ import eu.kanade.tachiyomi.util.system.launchIO
 import eu.kanade.tachiyomi.util.system.launchNonCancellableIO
 import eu.kanade.tachiyomi.util.system.withUIContext
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.collectLatest
@@ -68,7 +72,11 @@ open class BrowseSourcePresenter(
     val uiPreferences: UiPreferences = Injekt.get(),
     val preferences: PreferencesHelper = Injekt.get(),
     private val coverCache: CoverCache = Injekt.get(),
+    private val mangaEntityCache: MangaEntityCache = Injekt.get(),
 ) : BaseCoroutinePresenter<BrowseSourceController>() {
+    
+    private val logger = Logger.withTag("BrowseSourcePresenter")
+    
     private val getManga: GetManga by injectLazy()
     private val insertManga: InsertManga by injectLazy()
     private val updateManga: UpdateManga by injectLazy()
@@ -118,6 +126,43 @@ open class BrowseSourcePresenter(
      * Subscription for one request from the pager.
      */
     private var nextPageJob: Job? = null
+
+    /**
+     * Buffer for page data that arrives before the view is ready.
+     * Critical for pre-fetch optimization where data arrives before view creation.
+     */
+    private val pendingPageData = mutableListOf<Pair<Int, List<BrowseSourceItem>>>()
+
+    /**
+     * Loading state for reactive UI updates.
+     * 
+     * **Architecture: State-Driven Loading**
+     * This StateFlow replaces the old timer-based spinner scheduling approach which caused
+     * race conditions between data arrival and spinner visibility checks.
+     * 
+     * **Flow:**
+     * 1. `restartPager()` sets `_isLoading.value = true`
+     * 2. `BrowseSourcePager` reports loading completion via `onLoadingStateChange` callback
+     * 3. Controller observes this StateFlow in `setupStateObservers()` and reacts immediately
+     * 
+     * **Benefits:**
+     * - No spinner flash on cache hits (pager reports instant completion)
+     * - No race conditions (state updates are synchronous)
+     * - Reactive UI (follows existing ModeManager.currentMode pattern)
+     * 
+     * Pattern: Same as NovelDetailsPresenter.kt (novel reader architecture)
+     */
+    private val _isLoading = MutableStateFlow(false)
+    val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
+
+    /**
+     * Indicates if current data is from cache (instant load, no spinner).
+     * Used for logging and debugging - not directly shown to users.
+     * 
+     * Future: Could be used for cache staleness indicators or offline mode UI.
+     */
+    private val _isFromCache = MutableStateFlow(false)
+    val isFromCache: StateFlow<Boolean> = _isFromCache.asStateFlow()
 
     var query = searchQuery ?: ""
 
@@ -180,10 +225,17 @@ open class BrowseSourcePresenter(
      * @param filters the current state of the filters (for search mode).
      */
     fun restartPager(query: String = this.query, filters: FilterList = this.appliedFilters) {
+        Logger.d { "🔄 [PRESENTER] restartPager called - Query: '$query', Filters: ${filters.size}" }
         this.query = query
         this.appliedFilters = filters
+        
+        // Set loading state at start of pager restart
+        _isLoading.value = true
+        _isFromCache.value = false
+        Logger.d { "⏳ [STATE] Loading state set to true (pager restarting)" }
 
         // Create a new pager.
+        Logger.d { "🔄 [PRESENTER] Creating new pager..." }
         pager = createPager(
             query,
             filters.takeIf { it.isNotEmpty() || query.isBlank() } ?: source.getFilterList(),
@@ -198,22 +250,31 @@ open class BrowseSourcePresenter(
         view?.unsubscribe()
 
         // Prepare the pager.
+        Logger.d { "🔄 [PRESENTER] Cancelling old pager job and starting new one..." }
         pagerJob?.cancel()
         pagerJob = presenterScope.launchIO {
+            Logger.d { "🔄 [PRESENTER] Pager coroutine started, collecting flow..." }
             pager.asFlow()
                 .map { (first, second) ->
+                    Logger.d { "🔄 [PRESENTER] Received page ${first} with ${second.size} items from network" }
                     first to second
                         .map { networkToLocalManga(it, sourceId) }
                         .filter { !preferences.hideInLibraryItems().get() || !it.favorite }
                 }
-                .onEach { initializeMangas(it.second) }
+                .onEach { 
+                    Logger.d { "🔄 [PRESENTER] Initializing ${it.second.size} mangas..." }
+                    initializeMangas(it.second) 
+                }
                 .map { (first, second) ->
+                    Logger.d { "🔄 [PRESENTER] Converting ${second.size} mangas to BrowseSourceItems..." }
+                    val isNovel = source is eu.kanade.tachiyomi.source.novel.NovelSourceWrapper
                     first to second.map {
                         BrowseSourceItem(
                             it,
                             browseAsList,
                             sourceListType,
                             outlineCovers,
+                            isNovel,
                         )
                     }
                 }
@@ -222,10 +283,20 @@ open class BrowseSourcePresenter(
                 }
                 .collectLatest { (page, mangas) ->
                     if (mangas.isEmpty() && page == 1) {
+                        Logger.w { "🔄 [PRESENTER] First page is empty, calling onAddPageError" }
                         withUIContext { view?.onAddPageError(NoResultsException()) }
                         return@collectLatest
                     }
-                    withUIContext { view?.onAddPage(page, mangas) }
+                    Logger.d { "🔄 [PRESENTER] Calling view.onAddPage with page $page and ${mangas.size} items (view=${if (view != null) "EXISTS" else "NULL"})" }
+                    withUIContext { 
+                        val currentView = view
+                        if (currentView != null) {
+                            currentView.onAddPage(page, mangas)
+                        } else {
+                            Logger.w { "🔄 [PRESENTER] ⚠️ View is NULL! Buffering page $page with ${mangas.size} items" }
+                            pendingPageData.add(page to mangas)
+                        }
+                    }
                 }
         }
 
@@ -264,13 +335,33 @@ open class BrowseSourcePresenter(
      * @return a manga from the database.
      */
     private suspend fun networkToLocalManga(sManga: SManga, sourceId: Long): Manga {
-        var localManga = getManga.awaitByUrlAndSource(sManga.url, sourceId)
+        // PERFORMANCE OPTIMIZATION: Check entity cache first to avoid DB query
+        // This eliminates 30-50 DB queries per browse page after first load
+        var localManga = mangaEntityCache.getCached(sManga.url, sourceId)
+        
         if (localManga == null) {
-            val newManga = Manga.create(sManga.url, sManga.title, sourceId)
-            newManga.copyFrom(sManga)
-            newManga.id = insertManga.await(newManga)
-            localManga = newManga
-        } else if (localManga.title.isBlank()) {
+            // Cache miss - query database
+            logger.d { "📦 [ENTITY_CACHE] MISS for ${sManga.url} source $sourceId - querying DB" }
+            localManga = getManga.awaitByUrlAndSource(sManga.url, sourceId)
+            
+            if (localManga == null) {
+                // Not in DB - create new manga
+                val newManga = Manga.create(sManga.url, sManga.title, sourceId)
+                newManga.copyFrom(sManga)
+                newManga.id = insertManga.await(newManga)
+                localManga = newManga
+                logger.d { "📦 [ENTITY_CACHE] Created new manga: ${sManga.title}" }
+            }
+            
+            // Cache the result for future lookups
+            mangaEntityCache.putCached(localManga, sourceId)
+            logger.d { "📦 [ENTITY_CACHE] Cached manga: ${localManga.title}" }
+        } else {
+            logger.d { "📦 [ENTITY_CACHE] HIT for ${sManga.url} source $sourceId" }
+        }
+        
+        // Update title if needed
+        if (localManga.title.isBlank()) {
             localManga.title = sManga.title
             updateManga.await(
                 MangaUpdate(
@@ -278,11 +369,15 @@ open class BrowseSourcePresenter(
                     title = sManga.title,
                 )
             )
+            // Invalidate cache since we updated the manga
+            mangaEntityCache.invalidate(sManga.url, sourceId)
+            logger.d { "📦 [ENTITY_CACHE] Invalidated cache after title update" }
         } else if (!localManga.favorite) {
             // if the manga isn't a favorite, set its display title from source
             // if it later becomes a favorite, updated title will go to db
             localManga.title = sManga.title
         }
+        
         return localManga
     }
 
@@ -345,7 +440,15 @@ open class BrowseSourcePresenter(
             LatestUpdatesPager(source)
         } else {
             useLatest = false
-            BrowseSourcePager(source, query, filters)
+            BrowseSourcePager(
+                source, 
+                query, 
+                filters,
+                onLoadingStateChange = { isLoading -> 
+                    _isLoading.value = isLoading 
+                    Logger.d { "⏳ [STATE] Presenter received loading state: $isLoading" }
+                }
+            )
         }
     }
 
@@ -412,5 +515,33 @@ open class BrowseSourcePresenter(
 
     suspend fun loadSearches(): List<SavedSearch> {
        return getSavedSearch.awaitAllBySourceId(sourceId).applyAllSave(source.getFilterList())
+    }
+
+    /**
+     * Replays buffered data that arrived before view was ready.
+     * Called when view is attached/created to deliver pre-fetched content.
+     */
+    fun flushPendingData() {
+        if (pendingPageData.isEmpty()) {
+            Logger.d { "📦 [BUFFER] No pending data to replay" }
+            return
+        }
+        Logger.d { "📦 [BUFFER] Replaying ${pendingPageData.size} buffered pages" }
+        presenterScope.launchIO {
+            pendingPageData.sortedBy { it.first }.forEach { (page, items) ->
+                Logger.d { "📦 [BUFFER] Delivering buffered page $page with ${items.size} items" }
+                withUIContext { view?.onAddPage(page, items) }
+            }
+            pendingPageData.clear()
+            Logger.d { "📦 [BUFFER] Buffer cleared, all data delivered" }
+        }
+    }
+    
+    /**
+     * Get manga from database by URL and source.
+     * Used by BrowseSourceController to refresh favorite states.
+     */
+    suspend fun getMangaFromDb(url: String, sourceId: Long): Manga? {
+        return getManga.awaitByUrlAndSource(url, sourceId)
     }
 }

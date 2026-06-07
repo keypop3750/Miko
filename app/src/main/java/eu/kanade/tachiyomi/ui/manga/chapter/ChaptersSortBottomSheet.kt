@@ -28,12 +28,29 @@ import yokai.i18n.MR
 import kotlin.math.max
 import android.R as AR
 
-class ChaptersSortBottomSheet(controller: MangaDetailsController) :
-    E2EBottomSheetDialog<ChapterSortBottomSheetBinding>(controller.activity!!) {
+class ChaptersSortBottomSheet private constructor(
+    val activity: android.app.Activity,
+    private val presenter: eu.kanade.tachiyomi.ui.manga.MangaDetailsPresenter,
+    private val accentColor: Int? = null,
+    private val onFilterChanged: (() -> Unit)? = null
+) : E2EBottomSheetDialog<ChapterSortBottomSheetBinding>(activity) {
 
-    val activity = controller.activity!!
+    companion object {
+        // Factory method for Controller-based usage
+        operator fun invoke(controller: MangaDetailsController): ChaptersSortBottomSheet {
+            return ChaptersSortBottomSheet(controller.activity!!, controller.presenter, null, null)
+        }
 
-    private val presenter = controller.presenter
+        // Factory method for Activity-based usage
+        operator fun invoke(
+            activity: android.app.Activity,
+            presenter: eu.kanade.tachiyomi.ui.manga.MangaDetailsPresenter,
+            accentColor: Int?,
+            onFilterChanged: () -> Unit
+        ): ChaptersSortBottomSheet {
+            return ChaptersSortBottomSheet(activity, presenter, accentColor, onFilterChanged)
+        }
+    }
 
     override fun createBinding(inflater: LayoutInflater) = ChapterSortBottomSheetBinding.inflate(inflater)
     init {
@@ -71,6 +88,7 @@ class ChaptersSortBottomSheet(controller: MangaDetailsController) :
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         initGeneralPreferences()
+        applyAccentColor()
         setBottomEdge(binding.hideTitles, activity)
         binding.settingsScrollView.checkHeightThen {
             val isScrollable =
@@ -78,6 +96,44 @@ class ChaptersSortBottomSheet(controller: MangaDetailsController) :
                     binding.settingsScrollView.paddingTop + binding.settingsScrollView.paddingBottom
             // making the view gone somehow breaks the layout so lets make it invisible
             binding.pill.isInvisible = isScrollable
+        }
+    }
+    
+    /**
+     * Apply accent color from manga cover to UI elements.
+     */
+    private fun applyAccentColor() {
+        accentColor?.let { color ->
+            val colorStateList = android.content.res.ColorStateList.valueOf(color)
+            
+            // Apply to buttons
+            binding.setAsDefaultSort.setTextColor(color)
+            binding.resetAsDefaultSort.setTextColor(color)
+            binding.chapterFilterLayout.root.binding.setAsDefaultFilter.setTextColor(color)
+            binding.chapterFilterLayout.root.binding.resetAsDefaultFilter.setTextColor(color)
+            
+            // Apply to hide titles checkbox
+            binding.hideTitles.buttonTintList = colorStateList
+            
+            // Apply to filter checkboxes using TriStateCheckBox.setAccentColor()
+            binding.chapterFilterLayout.root.binding.showAll.setAccentColor(color)
+            binding.chapterFilterLayout.root.binding.showUnread.setAccentColor(color)
+            binding.chapterFilterLayout.root.binding.showDownload.setAccentColor(color)
+            binding.chapterFilterLayout.root.binding.showBookmark.setAccentColor(color)
+            
+            // Apply to sort arrows when they're active
+            applySortArrowColors()
+        }
+    }
+    
+    /**
+     * Apply accent color to sort arrows when they are in active state.
+     */
+    private fun applySortArrowColors() {
+        accentColor?.let { color ->
+            listOf(binding.byChapterNumber, binding.byUploadDate, binding.bySource).forEach { sortView ->
+                sortView.setAccentColor(color)
+            }
         }
     }
 
@@ -136,6 +192,8 @@ class ChaptersSortBottomSheet(controller: MangaDetailsController) :
             } else {
                 SortTextView.State.ASCENDING
             }
+            // Apply accent color to the active sort arrow after reset
+            applySortArrowColors()
             binding.setAsDefaultSort.isInvisible = true
             binding.resetAsDefaultSort.isInvisible = true
         }
@@ -185,9 +243,13 @@ class ChaptersSortBottomSheet(controller: MangaDetailsController) :
                 .setNegativeButton(AR.string.cancel, null)
                 .setPositiveButton(MR.strings.filter) { _, _ ->
                     presenter.setScanlatorFilter(filteredScanlators)
+                    // Notify Activity to refresh adapter
+                    onFilterChanged?.invoke()
                 }
                 .setNeutralButton(MR.strings.reset) { _, _ ->
                     presenter.setScanlatorFilter(emptySet())
+                    // Notify Activity to refresh adapter
+                    onFilterChanged?.invoke()
                 }
                 .show().apply {
                     alertDialog = this
@@ -201,6 +263,8 @@ class ChaptersSortBottomSheet(controller: MangaDetailsController) :
         binding.hideTitles.setOnCheckedChangeListener { _, isChecked ->
             presenter.hideTitle(isChecked)
             checkIfFilterMatchesDefault(binding.chapterFilterLayout.root)
+            // Notify Activity to refresh adapter
+            onFilterChanged?.invoke()
         }
     }
 
@@ -211,6 +275,8 @@ class ChaptersSortBottomSheet(controller: MangaDetailsController) :
             binding.chapterFilterLayout.showBookmark.state,
         )
         checkIfFilterMatchesDefault(filterLayout)
+        // Notify Activity to refresh adapter
+        onFilterChanged?.invoke()
     }
 
     private fun checkIfFilterMatchesDefault(filterLayout: ChapterFilterLayout) {
@@ -244,5 +310,9 @@ class ChaptersSortBottomSheet(controller: MangaDetailsController) :
             state == SortTextView.State.DESCENDING,
         )
         checkIfSortMatchesDefault()
+        // Apply accent color to the active sort arrow
+        applySortArrowColors()
+        // Notify Activity to refresh adapter
+        onFilterChanged?.invoke()
     }
 }

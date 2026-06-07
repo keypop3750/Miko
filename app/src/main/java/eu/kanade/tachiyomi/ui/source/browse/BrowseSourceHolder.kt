@@ -31,4 +31,20 @@ abstract class BrowseSourceHolder(view: View, adapter: FlexibleAdapter<IFlexible
      * @param manga the manga to bind.
      */
     abstract fun setImage(manga: Manga)
+    
+    /**
+     * Override to ensure long-click is properly handled for browse catalog items.
+     * FlexibleAdapter's default behavior may not always trigger the listener.
+     */
+    override fun onLongClick(view: View?): Boolean {
+        android.util.Log.d("BrowseSourceHolder", "onLongClick: position=$flexibleAdapterPosition")
+        val listener = mAdapter.mItemLongClickListener
+        if (listener != null) {
+            android.util.Log.d("BrowseSourceHolder", "onLongClick: calling listener")
+            listener.onItemLongClick(flexibleAdapterPosition)
+            return true
+        }
+        android.util.Log.d("BrowseSourceHolder", "onLongClick: no listener, calling super")
+        return super.onLongClick(view)
+    }
 }

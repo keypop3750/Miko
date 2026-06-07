@@ -1,0 +1,376 @@
+import kotlin.Boolean;
+
+-- Novel reading history (separate from manga history)
+CREATE TABLE novel_history (
+    history_id INTEGER PRIMARY KEY,
+    novel_chapter_id INTEGER NOT NULL,
+    last_read INTEGER DEFAULT 0,
+    time_read INTEGER DEFAULT 0,
+    character_position INTEGER NOT NULL DEFAULT 0,  -- Novel-specific: character tracking
+    reading_session_id TEXT,
+    date_created INTEGER NOT NULL DEFAULT (strftime('%s','now')),
+    FOREIGN KEY(novel_chapter_id) REFERENCES novel_chapters(_id) ON DELETE CASCADE
+);
+
+-- Create unique index for novel_chapter_id to prevent duplicates
+CREATE UNIQUE INDEX novel_history_chapter_id_index ON novel_history(novel_chapter_id);
+
+-- Index for reading session tracking
+CREATE INDEX novel_history_session_index ON novel_history(reading_session_id);
+CREATE INDEX novel_history_date_index ON novel_history(date_created);
+
+-- Novel history queries
+upsertHistory:
+INSERT INTO novel_history(novel_chapter_id, last_read, time_read, character_position, reading_session_id)
+VALUES(?, ?, ?, ?, ?)
+ON CONFLICT(novel_chapter_id)
+DO UPDATE SET
+    last_read = excluded.last_read,
+    time_read = ifnull(time_read, 0) + excluded.time_read,
+    character_position = excluded.character_position,
+    reading_session_id = excluded.reading_session_id,
+    date_created = (strftime('%s','now'))
+WHERE novel_chapter_id = excluded.novel_chapter_id;
+
+getHistoryByChapterId:
+SELECT * FROM novel_history
+WHERE novel_chapter_id = ?;
+
+getHistoryByNovelId:
+SELECT nh.*, nc.title, nc.chapter_number
+FROM novel_history nh
+JOIN novel_chapters nc ON nh.novel_chapter_id = nc._id
+WHERE nc.novel_id = ?
+ORDER BY nh.date_created DESC;
+
+getAllHistory:
+SELECT nh.*, nc.title, nc.chapter_number, n.title AS novel_title
+FROM novel_history nh
+JOIN novel_chapters nc ON nh.novel_chapter_id = nc._id
+JOIN novels n ON nc.novel_id = n._id
+ORDER BY nh.date_created DESC;
+
+getRecentHistory:
+SELECT nh.*, nc.title, nc.chapter_number, n.title AS novel_title
+FROM novel_history nh
+JOIN novel_chapters nc ON nh.novel_chapter_id = nc._id
+JOIN novels n ON nc.novel_id = n._id
+WHERE nh.date_created > ?
+ORDER BY nh.date_created DESC;
+
+deleteHistoryByChapterId:
+DELETE FROM novel_history
+WHERE novel_chapter_id = ?;
+
+deleteHistoryByNovelId:
+DELETE FROM novel_history
+WHERE novel_chapter_id IN (
+    SELECT _id FROM novel_chapters WHERE novel_id = ?
+);
+
+deleteAllHistory:
+DELETE FROM novel_history;
+
+deleteOldHistory:
+DELETE FROM novel_history
+WHERE date_created < ?;
+
+updateCharacterPosition:
+UPDATE novel_history
+SET character_position = ?, last_read = (strftime('%s','now'))
+WHERE novel_chapter_id = ?;
+
+getLastReadPositions:
+SELECT nh.novel_chapter_id, nh.character_position, nh.last_read
+FROM novel_history nh
+JOIN novel_chapters nc ON nh.novel_chapter_id = nc._id
+WHERE nc.novel_id = ?
+ORDER BY nh.last_read DESC;
+
+-- Novel recents queries that return data in MangaChapterHistory-compatible format
+-- These map novel fields to manga fields so the same UI can display both
+-- Column types must match MangaChapterHistory::mapper signature exactly
+
+getRecentsUngrouped:
+SELECT
+    -- Manga-compatible fields from novels table
+    N._id AS mangaId,
+    N.source AS source,
+    N.url AS mangaUrl,
+    CAST(NULL AS TEXT) AS artist,
+    N.author AS author,
+    N.description AS description,
+    N.genre AS genre,
+    N.title AS title,
+    N.status AS status,
+    N.poster_url AS thumbnailUrl,
+    N.favorite AS favorite,
+    N.last_update AS lastUpdate,
+    N.initialized AS initialized,
+    CAST(0 AS INTEGER) AS viewer,
+    CAST(0 AS INTEGER) AS hideTitle,
+    N.chapter_flags AS chapterFlags,
+    N.date_added AS dateAdded,
+    N.filtered_translators AS filteredScanlators,
+    CAST(0 AS INTEGER) AS updateStrategy,
+    N.cover_last_modified AS coverLastModified,
+    -- Chapter-compatible fields (nullable to match mapper signature)
+    CAST(NC._id AS INTEGER) AS chapterId,
+    CAST(NC.novel_id AS INTEGER) AS chapterMangaId,
+    CAST(NC.url AS TEXT) AS chapterUrl,
+    CAST(NC.title AS TEXT) AS name,
+    NC.translator AS scanlator,
+    CAST(NC.read AS INTEGER) AS read,
+    CAST(NC.bookmark AS INTEGER) AS bookmark,
+    CAST(NC.last_read_position AS INTEGER) AS lastPageRead,
+    CAST(0 AS INTEGER) AS pagesLeft,
+    NC.chapter_number AS chapterNumber,
+    CAST(NC.source_order AS INTEGER) AS sourceOrder,
+    CAST(NC.date_fetch AS INTEGER) AS dateFetch,
+    CAST(NC.date_upload AS INTEGER) AS dateUpload,
+    -- History-compatible fields
+    CAST(NH.history_id AS INTEGER) AS historyId,
+    CAST(NH.novel_chapter_id AS INTEGER) AS historyChapterId,
+    NH.last_read AS historyLastRead,
+    NH.time_read AS historyTimeRead
+FROM novels AS N
+JOIN novel_chapters AS NC ON N._id = NC.novel_id
+JOIN novel_history AS NH ON NC._id = NH.novel_chapter_id
+WHERE NH.last_read > 0
+AND lower(N.title) LIKE '%' || :search || '%'
+ORDER BY NH.last_read DESC
+LIMIT :limit OFFSET :offset;
+
+getRecentsBySeries:
+SELECT
+    -- Manga-compatible fields from novels table
+    N._id AS mangaId,
+    N.source AS source,
+    N.url AS mangaUrl,
+    CAST(NULL AS TEXT) AS artist,
+    N.author AS author,
+    N.description AS description,
+    N.genre AS genre,
+    N.title AS title,
+    N.status AS status,
+    N.poster_url AS thumbnailUrl,
+    N.favorite AS favorite,
+    N.last_update AS lastUpdate,
+    N.initialized AS initialized,
+    CAST(0 AS INTEGER) AS viewer,
+    CAST(0 AS INTEGER) AS hideTitle,
+    N.chapter_flags AS chapterFlags,
+    N.date_added AS dateAdded,
+    N.filtered_translators AS filteredScanlators,
+    CAST(0 AS INTEGER) AS updateStrategy,
+    N.cover_last_modified AS coverLastModified,
+    -- Chapter-compatible fields (nullable to match mapper signature)
+    CAST(NC._id AS INTEGER) AS chapterId,
+    CAST(NC.novel_id AS INTEGER) AS chapterMangaId,
+    CAST(NC.url AS TEXT) AS chapterUrl,
+    CAST(NC.title AS TEXT) AS name,
+    NC.translator AS scanlator,
+    CAST(NC.read AS INTEGER) AS read,
+    CAST(NC.bookmark AS INTEGER) AS bookmark,
+    CAST(NC.last_read_position AS INTEGER) AS lastPageRead,
+    CAST(0 AS INTEGER) AS pagesLeft,
+    NC.chapter_number AS chapterNumber,
+    CAST(NC.source_order AS INTEGER) AS sourceOrder,
+    CAST(NC.date_fetch AS INTEGER) AS dateFetch,
+    CAST(NC.date_upload AS INTEGER) AS dateUpload,
+    -- History-compatible fields
+    CAST(NH.history_id AS INTEGER) AS historyId,
+    CAST(NH.novel_chapter_id AS INTEGER) AS historyChapterId,
+    max_read.max_last_read AS historyLastRead,
+    NH.time_read AS historyTimeRead
+FROM novels AS N
+JOIN novel_chapters AS NC ON N._id = NC.novel_id
+JOIN novel_history AS NH ON NC._id = NH.novel_chapter_id
+JOIN (
+    SELECT
+        NC2.novel_id AS novel_id,
+        NC2._id AS chapter_id,
+        MAX(NH2.last_read) AS max_last_read
+    FROM novel_chapters AS NC2 
+    JOIN novel_history AS NH2 ON NC2._id = NH2.novel_chapter_id
+    GROUP BY NC2.novel_id
+) AS max_read
+ON NC.novel_id = max_read.novel_id
+AND NC._id = max_read.chapter_id
+AND max_read.max_last_read > 0
+WHERE lower(N.title) LIKE '%' || :search || '%'
+ORDER BY max_read.max_last_read DESC
+LIMIT :limit OFFSET :offset;
+
+getRecentsAll:
+SELECT  -- Recently read novels
+    N._id AS mangaId,
+    N.source AS source,
+    N.url AS mangaUrl,
+    CAST(NULL AS TEXT) AS artist,
+    N.author AS author,
+    N.description AS description,
+    N.genre AS genre,
+    N.title AS title,
+    N.status AS status,
+    N.poster_url AS thumbnailUrl,
+    N.favorite AS favorite,
+    N.last_update AS lastUpdate,
+    N.initialized AS initialized,
+    CAST(0 AS INTEGER) AS viewer,
+    CAST(0 AS INTEGER) AS hideTitle,
+    N.chapter_flags AS chapterFlags,
+    N.date_added AS dateAdded,
+    N.filtered_translators AS filteredScanlators,
+    CAST(0 AS INTEGER) AS updateStrategy,
+    N.cover_last_modified AS coverLastModified,
+    CAST(NC._id AS INTEGER) AS chapterId,
+    CAST(NC.novel_id AS INTEGER) AS chapterMangaId,
+    CAST(NC.url AS TEXT) AS chapterUrl,
+    CAST(NC.title AS TEXT) AS name,
+    NC.translator AS scanlator,
+    CAST(NC.read AS INTEGER) AS read,
+    CAST(NC.bookmark AS INTEGER) AS bookmark,
+    CAST(NC.last_read_position AS INTEGER) AS lastPageRead,
+    CAST(0 AS INTEGER) AS pagesLeft,
+    NC.chapter_number AS chapterNumber,
+    CAST(NC.source_order AS INTEGER) AS sourceOrder,
+    CAST(NC.date_fetch AS INTEGER) AS dateFetch,
+    CAST(NC.date_upload AS INTEGER) AS dateUpload,
+    CAST(NH.history_id AS INTEGER) AS historyId,
+    CAST(NH.novel_chapter_id AS INTEGER) AS historyChapterId,
+    NH.last_read AS historyLastRead,
+    NH.time_read AS historyTimeRead
+FROM (
+    SELECT N2.*
+    FROM novels AS N2
+    LEFT JOIN (
+        SELECT novel_id, COUNT(*) AS value
+        FROM novel_chapters
+        WHERE read = 0
+        GROUP BY novel_id
+    ) AS unread ON N2._id = unread.novel_id
+    WHERE (:include_read = 0 OR unread.value > 0)
+    GROUP BY N2._id
+    ORDER BY title
+) AS N
+JOIN novel_chapters AS NC ON N._id = NC.novel_id
+JOIN novel_history AS NH ON NC._id = NH.novel_chapter_id
+JOIN (
+    SELECT
+        NC2.novel_id AS novel_id,
+        NC2._id AS chapter_id,
+        MAX(NH2.last_read) AS max_last_read
+    FROM novel_chapters AS NC2 
+    JOIN novel_history AS NH2 ON NC2._id = NH2.novel_chapter_id
+    GROUP BY NC2.novel_id
+) AS max_read
+ON NC.novel_id = max_read.novel_id
+AND NC._id = max_read.chapter_id
+AND max_read.max_last_read > 0
+WHERE lower(N.title) LIKE '%' || :search || '%'
+
+UNION  -- Newly fetched novel chapters
+
+SELECT
+    N._id AS mangaId,
+    N.source AS source,
+    N.url AS mangaUrl,
+    CAST(NULL AS TEXT) AS artist,
+    N.author AS author,
+    N.description AS description,
+    N.genre AS genre,
+    N.title AS title,
+    N.status AS status,
+    N.poster_url AS thumbnailUrl,
+    N.favorite AS favorite,
+    N.last_update AS lastUpdate,
+    N.initialized AS initialized,
+    CAST(0 AS INTEGER) AS viewer,
+    CAST(0 AS INTEGER) AS hideTitle,
+    N.chapter_flags AS chapterFlags,
+    N.date_added AS dateAdded,
+    N.filtered_translators AS filteredScanlators,
+    CAST(0 AS INTEGER) AS updateStrategy,
+    N.cover_last_modified AS coverLastModified,
+    CAST(NC._id AS INTEGER) AS chapterId,
+    CAST(NC.novel_id AS INTEGER) AS chapterMangaId,
+    CAST(NC.url AS TEXT) AS chapterUrl,
+    CAST(NC.title AS TEXT) AS name,
+    NC.translator AS scanlator,
+    CAST(NC.read AS INTEGER) AS read,
+    CAST(NC.bookmark AS INTEGER) AS bookmark,
+    CAST(NC.last_read_position AS INTEGER) AS lastPageRead,
+    CAST(0 AS INTEGER) AS pagesLeft,
+    NC.chapter_number AS chapterNumber,
+    CAST(NC.source_order AS INTEGER) AS sourceOrder,
+    CAST(NC.date_fetch AS INTEGER) AS dateFetch,
+    CAST(NC.date_upload AS INTEGER) AS dateUpload,
+    CAST(NULL AS INTEGER) AS historyId,
+    CAST(NULL AS INTEGER) AS historyChapterId,
+    NC.date_fetch AS historyLastRead,
+    CAST(NULL AS INTEGER) AS historyTimeRead
+FROM novels AS N
+JOIN novel_chapters AS NC ON N._id = NC.novel_id
+JOIN (
+    SELECT
+        NC2.novel_id,
+        NC2._id,
+        max(date_upload)
+    FROM novel_chapters AS NC2 
+    JOIN novels AS N2 ON N2._id = NC2.novel_id
+    WHERE NC2.read = 0
+    GROUP BY NC2.novel_id
+) AS newest_chapter
+ON NC.novel_id = newest_chapter.novel_id
+WHERE N.favorite = 1
+AND NC._id = newest_chapter._id
+AND NC.date_fetch > N.date_added
+AND lower(N.title) LIKE '%' || :search || '%'
+
+UNION  -- Newly added novels
+
+SELECT
+    N._id AS mangaId,
+    N.source AS source,
+    N.url AS mangaUrl,
+    CAST(NULL AS TEXT) AS artist,
+    N.author AS author,
+    N.description AS description,
+    N.genre AS genre,
+    N.title AS title,
+    N.status AS status,
+    N.poster_url AS thumbnailUrl,
+    N.favorite AS favorite,
+    N.last_update AS lastUpdate,
+    N.initialized AS initialized,
+    CAST(0 AS INTEGER) AS viewer,
+    CAST(0 AS INTEGER) AS hideTitle,
+    N.chapter_flags AS chapterFlags,
+    N.date_added AS dateAdded,
+    N.filtered_translators AS filteredScanlators,
+    CAST(0 AS INTEGER) AS updateStrategy,
+    N.cover_last_modified AS coverLastModified,
+    CAST(NULL AS INTEGER) AS chapterId,
+    CAST(NULL AS INTEGER) AS chapterMangaId,
+    CAST(NULL AS TEXT) AS chapterUrl,
+    CAST(NULL AS TEXT) AS name,
+    CAST(NULL AS TEXT) AS scanlator,
+    CAST(NULL AS INTEGER) AS read,
+    CAST(NULL AS INTEGER) AS bookmark,
+    CAST(NULL AS INTEGER) AS lastPageRead,
+    CAST(NULL AS INTEGER) AS pagesLeft,
+    CAST(NULL AS REAL) AS chapterNumber,
+    CAST(NULL AS INTEGER) AS sourceOrder,
+    CAST(NULL AS INTEGER) AS dateFetch,
+    CAST(NULL AS INTEGER) AS dateUpload,
+    CAST(NULL AS INTEGER) AS historyId,
+    CAST(NULL AS INTEGER) AS historyChapterId,
+    N.date_added AS historyLastRead,
+    CAST(NULL AS INTEGER) AS historyTimeRead
+FROM novels AS N
+WHERE N.favorite = 1
+AND lower(N.title) LIKE '%' || :search || '%'
+
+ORDER BY historyLastRead DESC
+LIMIT :limit OFFSET :offset;

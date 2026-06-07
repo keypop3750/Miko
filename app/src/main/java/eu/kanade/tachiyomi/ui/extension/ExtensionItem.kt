@@ -25,11 +25,12 @@ data class ExtensionItem(
 ) :
     AbstractSectionableItem<ExtensionHolder, ExtensionGroupItem>(header) {
 
+    // Constructor supporting both ExtensionIntallInfo and FlexibleExtensionInstallInfo
     constructor(
         extension: Extension,
         header: ExtensionGroupItem? = null,
-        installInfo: ExtensionIntallInfo?,
-    ) : this(extension, header, installInfo?.first, installInfo?.second)
+        installInfo: FlexibleExtensionInstallInfo?,
+    ) : this(extension, header, installInfo?.first, installInfo?.second as? PackageInstaller.SessionInfo)
 
     val sessionProgress: Int?
         get() = (session?.progress?.times(100)?.toInt())

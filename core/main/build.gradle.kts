@@ -46,6 +46,7 @@ kotlin {
                 api(androidx.preference)
 
                 implementation(libs.quickjs.android)
+                implementation(libs.sqlite.bundled)
 
                 api(libs.unifile)
 

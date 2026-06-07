@@ -1,0 +1,98 @@
+package eu.kanade.tachiyomi.ui.novel.reader
+
+import android.text.Spanned
+
+/**
+ * Sealed class representing different types of content items in novel reader's RecyclerView.
+ * Inspired by WebtoonAdapter's approach with ReaderPage and ChapterTransition.
+ * 
+ * This architecture enables:
+ * - Paragraph-level rendering with natural spacing (via RecyclerView item margins)
+ * - Efficient updates using DiffUtil based on unique item IDs
+ * - Multiple content types (paragraphs, headers, loading states, errors)
+ * - Character-level position tracking for precise bookmarks
+ */
+sealed class NovelContentItem {
+    
+    /**
+     * A single paragraph of novel text.
+     * Equivalent to QuickNovel's TextSpan pattern.
+     * 
+     * @param text Rendered HTML as styled text (via Markwon)
+     * @param startCharIndex Character position in chapter (for bookmarks)
+     * @param endCharIndex End character position
+     * @param paragraphIndex Index within chapter (for scroll position)
+     * @param chapterId Chapter this paragraph belongs to
+     */
+    data class Paragraph(
+        val text: Spanned,
+        val startCharIndex: Int,
+        val endCharIndex: Int,
+        val paragraphIndex: Int,
+        val chapterId: Long
+    ) : NovelContentItem() {
+        /**
+         * Unique ID for DiffUtil stability.
+         * Formula: chapterId * 100000 + paragraphIndex ensures uniqueness across chapters.
+         */
+        val id: Long get() = chapterId * 100000L + paragraphIndex
+    }
+    
+    /**
+     * Chapter header/title item.
+     * Similar to ChapterTransition in WebtoonAdapter.
+     * 
+     * @param chapterId Chapter identifier
+     * @param chapterTitle Display title of the chapter
+     * @param chapterNumber Chapter number string (e.g., "Chapter 1", "Ch. 42")
+     */
+    data class ChapterHeader(
+        val chapterId: Long,
+        val chapterTitle: String,
+        val chapterNumber: String
+    ) : NovelContentItem() {
+        /**
+         * Unique ID for DiffUtil stability.
+         * Uses -1 offset to distinguish from paragraph items.
+         */
+        val id: Long get() = chapterId * 100000L - 1
+    }
+    
+    /**
+     * Loading indicator for lazy-loaded chapters.
+     * Displayed while fetching chapter content from provider.
+     * 
+     * @param chapterId Chapter being loaded
+     * @param loadingMessage Display message (default: "Loading chapter...")
+     */
+    data class Loading(
+        val chapterId: Long,
+        val loadingMessage: String = "Loading chapter..."
+    ) : NovelContentItem() {
+        /**
+         * Unique ID for DiffUtil stability.
+         * Uses -2 offset to distinguish from paragraph and header items.
+         */
+        val id: Long get() = chapterId * 100000L - 2
+    }
+    
+    /**
+     * Error state for failed chapter loads.
+     * Displayed when provider fetch fails or content parsing errors occur.
+     * 
+     * @param chapterId Chapter that failed to load
+     * @param errorMessage User-facing error description
+     * @param canRetry Whether retry action should be available
+     */
+    data class Error(
+        val chapterId: Long,
+        val errorMessage: String,
+        val canRetry: Boolean = true
+    ) : NovelContentItem() {
+        /**
+         * Unique ID for DiffUtil stability.
+         * Uses -3 offset to distinguish from other item types.
+         */
+        val id: Long get() = chapterId * 100000L - 3
+    }
+}

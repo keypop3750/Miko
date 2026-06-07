@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.coordinatorlayout.widget.CoordinatorLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/coordinator"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="?attr/background">
+
+    <!-- Backdrop solid color background -->
+    <View
+        android:id="@+id/true_backdrop"
+        android:layout_width="match_parent"
+        android:layout_height="320dp"
+        android:visibility="gone" />
+
+    <!-- Backdrop blurred cover image -->
+    <ImageView
+        android:id="@+id/backdrop"
+        android:layout_width="match_parent"
+        android:layout_height="320dp"
+        android:alpha="0.15"
+        android:scaleType="centerCrop"
+        android:visibility="gone"
+        android:contentDescription="@null" />
+
+    <!-- Backdrop gradient overlay -->
+    <View
+        android:id="@+id/backdrop_gradient"
+        android:layout_width="match_parent"
+        android:layout_height="320dp"
+        android:background="@drawable/gradient_shape"
+        android:backgroundTint="?attr/background"
+        android:visibility="gone" />
+
+    <com.google.android.material.appbar.AppBarLayout
+        android:id="@+id/app_bar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@android:color/transparent"
+        android:fitsSystemWindows="true">
+
+        <com.google.android.material.appbar.MaterialToolbar
+            android:id="@+id/toolbar"
+            android:layout_width="match_parent"
+            android:layout_height="?attr/actionBarSize"
+            android:background="@android:color/transparent"
+            app:titleTextColor="@android:color/white"
+            app:navigationIcon="@drawable/ic_arrow_back_24dp"
+            app:navigationIconTint="@android:color/white" />
+
+    </com.google.android.material.appbar.AppBarLayout>
+
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/recycler_view"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:clipToPadding="false"
+        android:paddingHorizontal="16dp"
+        android:paddingTop="0dp"
+        android:paddingBottom="16dp"
+        app:layout_behavior="@string/appbar_scrolling_view_behavior" />
+
+    <TextView
+        android:id="@+id/empty_view"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:text="No highlights yet.\nSelect text in the reader and tap 'Highlight' to save."
+        android:textAlignment="center"
+        android:textAppearance="?textAppearanceBodyMedium"
+        android:textColor="?android:attr/textColorSecondary"
+        android:visibility="gone" />
+
+</androidx.coordinatorlayout.widget.CoordinatorLayout>

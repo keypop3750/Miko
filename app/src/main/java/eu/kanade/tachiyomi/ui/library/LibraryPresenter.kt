@@ -20,9 +20,13 @@ import eu.kanade.tachiyomi.data.track.TrackManager
 import eu.kanade.tachiyomi.domain.manga.models.Manga
 import eu.kanade.tachiyomi.source.LocalSource
 import eu.kanade.tachiyomi.source.SourceManager
+import eu.kanade.tachiyomi.source.isNovelSource
 import eu.kanade.tachiyomi.source.model.SManga
 import eu.kanade.tachiyomi.source.online.HttpSource
 import eu.kanade.tachiyomi.ui.base.presenter.BaseCoroutinePresenter
+// Use the adapter LibraryItem, not the models one
+// import eu.kanade.tachiyomi.ui.library.models.LibraryItem
+// import eu.kanade.tachiyomi.ui.library.models.toLibraryItem
 import eu.kanade.tachiyomi.ui.library.LibraryGroup.BY_AUTHOR
 import eu.kanade.tachiyomi.ui.library.LibraryGroup.BY_DEFAULT
 import eu.kanade.tachiyomi.ui.library.LibraryGroup.BY_LANGUAGE
@@ -42,6 +46,7 @@ import eu.kanade.tachiyomi.util.lang.capitalizeWords
 import eu.kanade.tachiyomi.util.lang.chopByWords
 import eu.kanade.tachiyomi.util.lang.removeArticles
 import eu.kanade.tachiyomi.util.manga.MangaCoverMetadata
+import eu.kanade.tachiyomi.util.novel.NovelCoverMetadata
 import eu.kanade.tachiyomi.util.mapStatus
 import eu.kanade.tachiyomi.util.system.launchIO
 import eu.kanade.tachiyomi.util.system.launchNonCancellableIO
@@ -57,6 +62,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.retry
 import kotlinx.coroutines.launch
@@ -65,9 +71,13 @@ import kotlinx.coroutines.withContext
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
 import uy.kohesive.injekt.injectLazy
+import yokai.core.content.ContentType
+import yokai.core.mode.ModeManager
 import yokai.domain.category.interactor.GetCategories
+import yokai.domain.category.interactor.GetNovelCategories
 import yokai.domain.category.interactor.SetMangaCategories
 import yokai.domain.category.interactor.UpdateCategories
+import yokai.domain.category.NovelCategoryRepository
 import yokai.domain.category.models.CategoryUpdate
 import yokai.domain.chapter.interactor.GetChapter
 import yokai.domain.chapter.interactor.UpdateChapter
@@ -78,6 +88,8 @@ import yokai.domain.manga.interactor.GetLibraryManga
 import yokai.domain.manga.interactor.GetManga
 import yokai.domain.manga.interactor.UpdateManga
 import yokai.domain.manga.models.MangaUpdate
+import yokai.domain.novel.Novel
+import yokai.domain.novel.NovelRepository
 import yokai.domain.track.interactor.GetTrack
 import yokai.i18n.MR
 import yokai.util.isLewd
@@ -98,8 +110,11 @@ class LibraryPresenter(
     private val downloadManager: DownloadManager = Injekt.get(),
     private val chapterFilter: ChapterFilter = Injekt.get(),
     private val trackManager: TrackManager = Injekt.get(),
+    private val novelRepository: NovelRepository = Injekt.get(),
 ) : BaseCoroutinePresenter<LibraryController>() {
     private val getCategories: GetCategories by injectLazy()
+    private val getNovelCategories: GetNovelCategories by injectLazy()
+    private val novelCategoryRepository: NovelCategoryRepository by injectLazy()
     private val setMangaCategories: SetMangaCategories by injectLazy()
     private val updateCategories: UpdateCategories by injectLazy()
     private val getLibraryManga: GetLibraryManga by injectLazy()
@@ -108,8 +123,12 @@ class LibraryPresenter(
     private val updateManga: UpdateManga by injectLazy()
     private val getTrack: GetTrack by injectLazy()
     private val getHistory: GetHistory by injectLazy()
+    private val getNovelChapter: yokai.domain.novelchapter.interactor.GetNovelChapter by injectLazy()
 
     private val forceUpdateEvent: Channel<Unit> = Channel(Channel.UNLIMITED)
+    
+    /** Job for tracking the current library subscription - cancelled on mode change */
+    private var librarySubscriptionJob: kotlinx.coroutines.Job? = null
 
     private val context = preferences.context
     private val viewContext
@@ -126,8 +145,9 @@ class LibraryPresenter(
     var categories: List<Category> = emptyList()
         private set
 
-    /** All categories of the library, in case they are hidden because of hide categories is on */
-    private var allCategories: List<Category> = emptyList()
+    /** All categories of the library, including empty ones, for navigation purposes */
+    var allCategories: List<Category> = emptyList()
+        private set
 
     private var removeArticles: Boolean = preferences.removeArticles().get()
 
@@ -146,6 +166,34 @@ class LibraryPresenter(
     var currentCategory: Category?
         get() = allCategories.find { it.id == currentCategoryId }
         set(value) { currentCategoryId = value?.id ?: 0 }
+
+    /**
+     * Gets the starting category based on homeLibraryCategory preference.
+     * -1 means "last used", any other value is a specific category ID.
+     * Returns a Pair<Int?, Int> where first is category ID (if known), second is order.
+     */
+    private fun getStartingCategory(): Category? {
+        val homeCategory = preferences.homeLibraryCategory().get()
+        val lastUsed = preferences.lastUsedCategory().get()
+        
+        return if (homeCategory == -1) {
+            // Use last used category - try to find by ID first, fall back to order
+            categories.find { it.id == lastUsed } 
+                ?: categories.find { it.order == lastUsed }
+                ?: categories.firstOrNull()
+        } else {
+            // Find the category by ID directly
+            categories.find { it.id == homeCategory }
+                ?: categories.firstOrNull()
+        }
+    }
+    
+    /**
+     * Legacy method for compatibility - returns order for old code paths
+     */
+    private fun getStartingCategoryOrder(): Int {
+        return getStartingCategory()?.order ?: -1
+    }
 
     private var hiddenLibraryItems: List<LibraryItem> = emptyList()
     var forceShowAllCategories = false
@@ -206,7 +254,29 @@ class LibraryPresenter(
             lastLibrary = null
         }
 
-        subscribeLibrary()
+        // Observe mode changes and refresh library accordingly
+        presenterScope.launchIO {
+            ModeManager.currentMode.collectLatest { mode ->
+                // Cancel any existing library subscription to prevent race conditions
+                librarySubscriptionJob?.cancel()
+                librarySubscriptionJob = null
+                
+                // Clear categories and library content when switching modes
+                // Novel mode uses novel_categories table, manga mode uses categories table
+                categories = emptyList()
+                libraryToDisplay = mutableMapOf()
+                currentLibrary = mutableMapOf()
+                hiddenLibraryItems = emptyList()
+                
+                // Start new subscription in a tracked job
+                librarySubscriptionJob = when (mode) {
+                    ContentType.MANGA -> launchMangaLibrarySubscription()
+                    ContentType.NOVEL -> launchNovelLibrarySubscription()
+                }
+            }
+        }
+
+        // Initial library load based on current mode
         updateLibrary()
 
         if (!preferences.showLibrarySearchSuggestions().isSet()) {
@@ -235,8 +305,8 @@ class LibraryPresenter(
         return items?.size ?: 0
     }
 
-    private fun subscribeLibrary() {
-        presenterScope.launchIO {
+    private fun launchMangaLibrarySubscription(): kotlinx.coroutines.Job {
+        return presenterScope.launchIO {
             // Initial setup
             if (categories.isEmpty()) {
                 val dbCategories = getCategories.await()
@@ -247,9 +317,12 @@ class LibraryPresenter(
             }
 
             combine(
-                getLibraryFlow(),
+                getMangaLibraryFlow(),
                 downloadCache.changes,
             ) { data, _ -> data }.collectLatest { data ->
+                // Double-check we're still in manga mode before updating UI
+                if (ModeManager.currentMode.value != ContentType.MANGA) return@collectLatest
+                
                 categories = data.categories
                 allCategories = data.allCategories
 
@@ -276,6 +349,119 @@ class LibraryPresenter(
         }
     }
 
+    private fun launchNovelLibrarySubscription(): kotlinx.coroutines.Job {
+        return presenterScope.launchIO {
+            // Novel library subscription with force update event (mirrors manga pattern)
+            combine(
+                novelRepository.getFavoriteNovels(),
+                getNovelCategories.subscribe(), // React to category changes
+                forceUpdateEvent.receiveAsFlow().onStart { emit(Unit) },
+            ) { novels, dbCategories, _ -> Pair(novels, dbCategories) }.collectLatest { (novels, dbCategories) ->
+                // Double-check we're still in novel mode before updating UI
+                if (ModeManager.currentMode.value != ContentType.NOVEL) return@collectLatest
+                
+                android.util.Log.d("LibraryPresenter", "=== NOVEL LIBRARY LOAD START ===")
+                android.util.Log.d("LibraryPresenter", "launchNovelLibrarySubscription: novels.size=${novels.size}, dbCategories.size=${dbCategories.size}")
+                
+                // Setup categories - always include default + all user categories
+                // CRITICAL FIX: Use createDefaultCategory() to load the sort preference!
+                val defaultCategory = createDefaultCategory()
+                android.util.Log.d("LibraryPresenter", "launchNovelLibrarySubscription: defaultCategory.mangaSort=${defaultCategory.mangaSort}, sortingMode=${defaultCategory.sortingMode()}")
+                val allCategories = listOf(defaultCategory) + dbCategories
+                categories = allCategories.toMutableList()
+                this@LibraryPresenter.allCategories = allCategories
+                
+                // Build category lookup map
+                val categoryMap = allCategories.associateBy { it.id ?: 0 }
+                
+                // Create LibraryNovelItem for each novel with proper category assignment
+                val novelLibraryItems: List<Pair<Int, LibraryNovelItem>> = novels.map { novel: Novel ->
+                    val novelId = novel.id ?: 0L
+                    
+                    // Get the category for this novel (first assigned category, or default)
+                    val novelCategories = if (novelId > 0) {
+                        novelCategoryRepository.getAllByNovelId(novelId)
+                    } else {
+                        emptyList()
+                    }
+                    val categoryId = novelCategories.firstOrNull()?.id ?: 0
+                    val category = categoryMap[categoryId] ?: defaultCategory
+                    
+                    val item = LibraryNovelItem(
+                        novel = novel,
+                        header = LibraryHeaderItem({ catId -> categoryMap[catId] ?: defaultCategory }, category.id ?: 0),
+                        context = context
+                    )
+                    
+                    // Fetch novel metadata from repository if novel has ID
+                    if (novelId > 0) {
+                        item.downloadCount = getNovelChapter.getDownloadedCount(novelId).toInt()
+                        item.unreadCount = getNovelChapter.getUnreadCount(novelId).toInt()
+                        item.totalChapters = getNovelChapter.getTotalCount(novelId)
+                        item.lastReadChapter = getNovelChapter.getLastReadChapterTitle(novelId)
+                    } else {
+                        item.downloadCount = 0
+                        item.unreadCount = 0
+                        item.totalChapters = 0L
+                        item.lastReadChapter = null
+                    }
+                    
+                    // Language detection from source (novels are typically source 6000+)
+                    item.language = when {
+                        novel.source >= 6000L -> "Novel"
+                        else -> ""
+                    }
+                    
+                    Pair(category.id ?: 0, item)
+                }
+                
+                // Group novels by category
+                val groupedByCategory = novelLibraryItems.groupBy { it.first }
+                val novelMap: MutableMap<Category, List<LibraryItem>> = mutableMapOf()
+                
+                // Add categories with their novels
+                allCategories.forEach { category ->
+                    val catId = category.id ?: 0
+                    val items = groupedByCategory[catId]?.map { it.second } ?: emptyList()
+                    if (items.isNotEmpty() || catId == 0) {
+                        // Always include default category, or categories with items
+                        novelMap[category] = items.ifEmpty {
+                            listOf(
+                                LibraryPlaceholderItem.blank(
+                                    catId,
+                                    LibraryHeaderItem({ categoryMap[it] ?: defaultCategory }, catId),
+                                    viewContext,
+                                )
+                            )
+                        }
+                    }
+                }
+                
+                // Ensure at least default category exists
+                if (novelMap.isEmpty()) {
+                    novelMap[defaultCategory] = listOf(
+                        LibraryPlaceholderItem.blank(
+                            0,
+                            LibraryHeaderItem({ categoryMap[it] ?: defaultCategory }, 0),
+                            viewContext,
+                        )
+                    )
+                }
+
+                currentLibrary = novelMap
+                hiddenLibraryItems = emptyList()
+                
+                // Apply sort to novel map (same as manga path)
+                val sortedNovelMap = novelMap.applySort()
+                android.util.Log.d("LibraryPresenter", "launchNovelLibrarySubscription: Applied sort, novelMap.size=${sortedNovelMap.size}")
+                android.util.Log.d("LibraryPresenter", "=== NOVEL LIBRARY LOAD END ===")
+                
+                val freshStart = libraryToDisplay.isEmpty()
+                sectionLibrary(sortedNovelMap, freshStart)
+            }
+        }
+    }
+
     private suspend fun reorderCategories(categories: List<Category>) {
         val sortedCategories = categories.sortedBy { it.order }
         sortedCategories.forEachIndexed { i, category -> category.order = i }
@@ -285,8 +471,22 @@ class LibraryPresenter(
     }
 
     fun switchSection(order: Int) {
-        preferences.lastUsedCategory().set(order)
         val category = categories.find { it.order == order } ?: return
+        // Save category ID for restoration (more reliable than order for novels)
+        preferences.lastUsedCategory().set(category.id ?: 0)
+        currentCategory = category
+        view?.onNextLibraryUpdate(libraryToDisplay[category] ?: blankItem())
+    }
+
+    /**
+     * Switch to a category by its ID instead of order.
+     * This is more reliable for novel categories which may have non-unique orders.
+     */
+    fun switchSectionById(categoryId: Int) {
+        val category = categories.find { it.id == categoryId } ?: return
+        android.util.Log.d("LibraryPresenter", "switchSectionById: switching to ${category.name} (id=$categoryId, order=${category.order})")
+        // Save category ID for restoration (more reliable than order for novels)
+        preferences.lastUsedCategory().set(categoryId)
         currentCategory = category
         view?.onNextLibraryUpdate(libraryToDisplay[category] ?: blankItem())
     }
@@ -305,12 +505,12 @@ class LibraryPresenter(
     fun restoreLibrary() {
         val show = showAllCategories || !libraryIsGrouped || categories.size == 1
         if (!show && currentCategoryId == -1) {
-            currentCategory = categories.find { it.order == preferences.lastUsedCategory().get() }
+            currentCategory = getStartingCategory()
         }
         view?.onNextLibraryUpdate(
             if (!show) {
                 libraryToDisplay[currentCategory]
-                    ?: libraryToDisplay[categories.first()]
+                    ?: libraryToDisplay[categories.firstOrNull()]
                     ?: blankItem()
             } else {
                 libraryItemsToDisplay
@@ -333,20 +533,18 @@ class LibraryPresenter(
         libraryToDisplay = items.toMutableMap()
 
         if (!showAll && currentCategoryId == -1) {
-            currentCategory = categories.find { it.order == preferences.lastUsedCategory().get() }
+            currentCategory = getStartingCategory()
         }
 
         withUIContext {
-            view?.onNextLibraryUpdate(
-                if (!showAll) {
-                    libraryToDisplay[currentCategory]
-                        ?: libraryToDisplay[categories.first()]
-                        ?: blankItem()
-                } else {
-                    libraryItemsToDisplay
-                },
-                freshStart,
-            )
+            val itemsToSend = if (!showAll) {
+                libraryToDisplay[currentCategory]
+                    ?: libraryToDisplay[categories.firstOrNull()]
+                    ?: blankItem()
+            } else {
+                libraryItemsToDisplay
+            }
+            view?.onNextLibraryUpdate(itemsToSend, freshStart)
         }
     }
 
@@ -665,9 +863,65 @@ class LibraryPresenter(
 
         val sortFn: (LibraryItem, LibraryItem) -> Int = { i1, i2 ->
             val category = i1.header.category
+            android.util.Log.d("LibraryPresenter", "applySort: category.id=${category.id}, category.mangaSort=${category.mangaSort}, sortingMode=${category.sortingMode()}")
             val compare = when {
                 i1 is LibraryPlaceholderItem -> -1
                 i2 is LibraryPlaceholderItem -> 1
+                // Novel items - sort based on category sort mode
+                i1 is LibraryNovelItem && i2 is LibraryNovelItem -> {
+                    android.util.Log.d("LibraryPresenter", "applySort: Sorting novels, category.mangaSort=${category.mangaSort}")
+                    var sort = when (category.sortingMode() ?: LibrarySort.Title) {
+                        LibrarySort.Title -> i1.novel.title.compareTo(i2.novel.title, ignoreCase = true)
+                        LibrarySort.LatestChapter -> (i2.novel.lastUpdate).compareTo(i1.novel.lastUpdate)
+                        LibrarySort.Unread -> when {
+                            i1.unreadCount == i2.unreadCount -> 0
+                            i1.unreadCount == 0 -> if (category.isAscending()) 1 else -1
+                            i2.unreadCount == 0 -> if (category.isAscending()) -1 else 1
+                            else -> i1.unreadCount.compareTo(i2.unreadCount)
+                        }
+                        LibrarySort.LastRead -> {
+                            // Use novel's last chapter read info if available
+                            0 // TODO: Implement when novel tracking is ready
+                        }
+                        LibrarySort.TotalChapters -> {
+                            (i1.totalChapters).compareTo(i2.totalChapters)
+                        }
+                        LibrarySort.DateFetched -> {
+                            // Use last update as proxy for now
+                            i1.novel.lastUpdate.compareTo(i2.novel.lastUpdate)
+                        }
+                        LibrarySort.DateAdded -> i2.novel.dateAdded.compareTo(i1.novel.dateAdded)
+                        LibrarySort.DragAndDrop -> {
+                            // Use saved order from category.mangaOrder (same field used for novels)
+                            val itemCategory = i1.header.category
+                            if (itemCategory.isDynamic) {
+                                val category1 = categoryOrderMap[i1.header.category.id] ?: 0
+                                val category2 = categoryOrderMap[i2.header.category.id] ?: 0
+                                category1.compareTo(category2)
+                            } else if (itemCategory.mangaOrder.isNotEmpty()) {
+                                val order = itemCategory.mangaOrder
+                                val index1 = order.indexOf(i1.novel.id)
+                                val index2 = order.indexOf(i2.novel.id)
+                                when {
+                                    index1 == index2 -> 0
+                                    index1 == -1 -> 1  // Not in order list goes to end
+                                    index2 == -1 -> -1
+                                    else -> index1.compareTo(index2)
+                                }
+                            } else {
+                                // No order saved yet, fall back to title
+                                i1.novel.title.compareTo(i2.novel.title, ignoreCase = true)
+                            }
+                        }
+                        LibrarySort.Random -> {
+                            error("You're not supposed to be here...")
+                        }
+                    }
+                    if (!category.isAscending()) sort *= -1
+                    sort
+                }
+                i1 is LibraryNovelItem -> 1 // Novels after manga
+                i2 is LibraryNovelItem -> -1 // Manga before novels
                 i1 !is LibraryMangaItem || i2 !is LibraryMangaItem -> 0
                 category.mangaSort != null -> {
                     var sort = when (category.sortingMode() ?: LibrarySort.Title) {
@@ -860,23 +1114,31 @@ class LibraryPresenter(
      *
      * If category id '-1' is not empty, it means the library not grouped by categories
      */
-    private fun getLibraryFlow(): Flow<LibraryData> {
+    private fun getMangaLibraryFlow(): Flow<LibraryData> {
         val libraryFlow = combine(
             getCategories.subscribe(),
             // FIXME: Remove retry once a real solution is found
             getLibraryManga.subscribe().retry(1) { e -> e is NullPointerException },
             getPreferencesFlow(),
-            forceUpdateEvent.receiveAsFlow(),
+            forceUpdateEvent.receiveAsFlow().onStart { emit(Unit) }, // Emit initial value for immediate combine
         ) { dbCategories, libraryMangaList, prefs, _ ->
             groupType = prefs.groupType
 
             val defaultCategory = createDefaultCategory()
+            
+            // Filter out manga from novel sources using proper source type checking
+            // The source ID threshold doesn't work because manga sources also have large hashed IDs
+            val mangaOnlyList = libraryMangaList.filter { libraryManga ->
+                val source = sourceManager.get(libraryManga.manga.source)
+                // Keep the manga if the source doesn't exist (stub) or if it's NOT a novel source
+                source == null || !source.isNovelSource()
+            }
 
             // FIXME: Should return Map<Int, LibraryItem> where Int is category id
             if (groupType <= BY_DEFAULT || !libraryIsGrouped) {
                 getLibraryItems(
                     dbCategories,
-                    libraryMangaList,
+                    mangaOnlyList,
                     prefs.sortingMode,
                     prefs.sortAscending,
                     prefs.showAllCategories,
@@ -885,7 +1147,7 @@ class LibraryPresenter(
                 )
             } else {
                 getDynamicLibraryItems(
-                    libraryMangaList,
+                    mangaOnlyList,
                     prefs.sortingMode,
                     prefs.sortAscending,
                     groupType,
@@ -1201,16 +1463,42 @@ class LibraryPresenter(
         }
     }
 
-    /** Create a default category with the sort set */
+    /** Create a default category with the sort set (mode-aware) */
     private fun createDefaultCategory(): Category {
+        android.util.Log.d("LibraryPresenter", "createDefaultCategory: mode=${ModeManager.currentMode.value}")
         val default = Category.createDefault(view?.applicationContext ?: context)
         default.order = -1
-        val defOrder = preferences.defaultMangaOrder().get()
-        if (defOrder.firstOrNull()?.isLetter() == true) {
-            default.mangaSort = defOrder.first()
-        } else {
-            default.mangaOrder = defOrder.split("/").mapNotNull { it.toLongOrNull() }
+        
+        // Use mode-appropriate order preference
+        val defOrder = when (ModeManager.currentMode.value) {
+            ContentType.NOVEL -> {
+                val order = preferences.defaultNovelOrder().get()
+                android.util.Log.d("LibraryPresenter", "createDefaultCategory: NOVEL mode, defOrder='$order'")
+                order
+            }
+            ContentType.MANGA -> {
+                val order = preferences.defaultMangaOrder().get()
+                android.util.Log.d("LibraryPresenter", "createDefaultCategory: MANGA mode, defOrder='$order'")
+                order
+            }
         }
+        
+        if (defOrder.firstOrNull()?.isLetter() == true) {
+            android.util.Log.d("LibraryPresenter", "createDefaultCategory: Setting mangaSort=${defOrder.first()}")
+            default.mangaSort = defOrder.first()
+        } else if (defOrder.isNotBlank()) {
+            android.util.Log.d("LibraryPresenter", "createDefaultCategory: Setting mangaOrder from IDs")
+            default.mangaOrder = defOrder.split("/").mapNotNull { it.toLongOrNull() }
+        } else {
+            // Default to Title sort for novels (not DragAndDrop)
+            if (ModeManager.currentMode.value == ContentType.NOVEL) {
+                android.util.Log.d("LibraryPresenter", "createDefaultCategory: Defaulting novel to Title sort")
+                default.mangaSort = LibrarySort.Title.categoryValue
+            } else {
+                android.util.Log.d("LibraryPresenter", "createDefaultCategory: No default order, manga will use DragAndDrop")
+            }
+        }
+        android.util.Log.d("LibraryPresenter", "createDefaultCategory: Final mangaSort=${default.mangaSort}")
         return default
     }
 
@@ -1305,6 +1593,16 @@ class LibraryPresenter(
         forceUpdateEvent.send(Unit)
     }
 
+    /** Called when mode toggle occurs - explicit library content refresh */
+    fun updateLibrary(fromModeChange: Boolean = false) {
+        if (fromModeChange) {
+            // Mode change triggers automatic re-subscription through ModeManager.currentMode.collectLatest
+            // No explicit action needed as the flow subscription will handle the update
+        } else {
+            updateLibrary()
+        }
+    }
+
 
     /** Undo the removal of the manga once in library */
     fun reAddMangas(mangas: List<Manga>) {
@@ -1316,6 +1614,60 @@ class LibraryPresenter(
             (view as? FilteredLibraryController)?.updateStatsPage()
         }
     }
+    
+    //region Novel Library Management
+    
+    /**
+     * Remove novels from library (unfavorite).
+     */
+    fun removeNovelsFromLibrary(novels: List<yokai.domain.novel.Novel>) {
+        presenterScope.launch {
+            val novelUpdates = novels.distinctBy { it.id }
+                .mapNotNull { novel ->
+                    novel.id?.let { id ->
+                        yokai.domain.novel.models.NovelUpdate(id = id, inLibrary = false)
+                    }
+                }
+            withIOContext { 
+                novelUpdates.forEach { update ->
+                    novelRepository.update(update)
+                }
+            }
+        }
+    }
+    
+    /**
+     * Undo the removal of novels from library.
+     */
+    fun reAddNovels(novels: List<yokai.domain.novel.Novel>) {
+        presenterScope.launch {
+            val novelUpdates = novels.distinctBy { it.id }
+                .mapNotNull { novel ->
+                    novel.id?.let { id ->
+                        yokai.domain.novel.models.NovelUpdate(id = id, inLibrary = true)
+                    }
+                }
+            withIOContext { 
+                novelUpdates.forEach { update ->
+                    novelRepository.update(update)
+                }
+            }
+        }
+    }
+    
+    /**
+     * Confirm novel deletion (delete downloads and covers).
+     */
+    fun confirmNovelDeletion(novels: List<yokai.domain.novel.Novel>) {
+        presenterScope.launchNonCancellableIO {
+            novels.distinctBy { it.id }.forEach { novel ->
+                // TODO: Add novel cover cache deletion when implemented
+                // TODO: Add novel download deletion when implemented
+            }
+        }
+    }
+    
+    //endregion
 
     /** Returns first unread chapter of a manga */
     fun getFirstUnread(manga: Manga): Chapter? {
@@ -1324,11 +1676,13 @@ class LibraryPresenter(
         return ChapterSort(manga, chapterFilter, preferences).getNextUnreadChapter(chapters, false)
     }
 
-    /** Update a category's sorting */
+    /** Update a category's sorting (mode-aware for manga/novels) */
     fun sortCategory(catId: Int, order: Char) {
+        android.util.Log.d("LibraryPresenter", "sortCategory: catId=$catId, order=$order, mode=${ModeManager.currentMode.value}")
         val category = categories.find { catId == it.id } ?: return
         category.mangaSort = order
         if (catId == -1 || category.isDynamic) {
+            android.util.Log.d("LibraryPresenter", "sortCategory: Dynamic category or catId=-1")
             val sort = category.sortingMode() ?: LibrarySort.Title
             preferences.librarySortingMode().set(sort.mainValue)
             preferences.librarySortingAscending().set(category.isAscending())
@@ -1337,8 +1691,22 @@ class LibraryPresenter(
             }
         } else if (catId >= 0) {
             if (category.id == 0) {
-                preferences.defaultMangaOrder().set(category.mangaSort.toString())
+                android.util.Log.d("LibraryPresenter", "sortCategory: Default category (id=0), saving to preference")
+                // Save to mode-appropriate preference
+                val orderPref = when (ModeManager.currentMode.value) {
+                    ContentType.NOVEL -> {
+                        android.util.Log.d("LibraryPresenter", "sortCategory: Saving to defaultNovelOrder")
+                        preferences.defaultNovelOrder()
+                    }
+                    ContentType.MANGA -> {
+                        android.util.Log.d("LibraryPresenter", "sortCategory: Saving to defaultMangaOrder")
+                        preferences.defaultMangaOrder()
+                    }
+                }
+                orderPref.set(category.mangaSort.toString())
+                android.util.Log.d("LibraryPresenter", "sortCategory: Saved '$order' to preference")
             } else {
+                android.util.Log.d("LibraryPresenter", "sortCategory: Non-default category, updating DB")
                 onCategoryUpdate(
                     CategoryUpdate(
                         id = catId.toLong(),
@@ -1359,6 +1727,28 @@ class LibraryPresenter(
             category.mangaOrder = mangaIds
             if (category.id == 0) {
                 preferences.defaultMangaOrder().set(mangaIds.joinToString("/"))
+            } else {
+                updateCategories.awaitOne(
+                    CategoryUpdate(
+                        id = category.id!!.toLong(),
+                        mangaOrder = category.mangaOrderToString(),
+                    ),
+                )
+            }
+            requestSortUpdate()
+        }
+    }
+
+    /** Update a category's order for novels */
+    fun rearrangeNovelCategory(catId: Int?, novelIds: List<Long>) {
+        presenterScope.launch {
+            val category = categories.find { catId == it.id } ?: return@launch
+            if (category.isDynamic) return@launch
+            category.mangaSort = null
+            // Use the same mangaOrder field for novel ordering within categories
+            category.mangaOrder = novelIds
+            if (category.id == 0) {
+                preferences.defaultNovelOrder().set(novelIds.joinToString("/"))
             } else {
                 updateCategories.awaitOne(
                     CategoryUpdate(
@@ -1672,6 +2062,7 @@ class LibraryPresenter(
                 try { withUIContext { MangaCoverMetadata.setRatioAndColors(manga.id, manga.thumbnail_url, manga.favorite) } } catch (_: Exception) { }
             }
             MangaCoverMetadata.savePrefs()
+            NovelCoverMetadata.savePrefs()
         }
 
         suspend fun updateCustoms(

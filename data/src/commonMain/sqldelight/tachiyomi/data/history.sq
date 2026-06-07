@@ -74,6 +74,11 @@ WHERE lower(M.title) LIKE '%' || :search || '%'
 AND (
     :apply_filter = 0 OR S.name IS NULL
 )
+AND (
+    :content_type = 0 OR 
+    (:content_type = 1 AND M.source < 6000) OR 
+    (:content_type = 2 AND M.source >= 6000)
+)
 ORDER BY H.history_last_read DESC
 LIMIT :limit OFFSET :offset;
 
@@ -106,6 +111,11 @@ WHERE lower(M.title) LIKE '%' || :search || '%'
 AND (
     :apply_filter = 0 OR S.name IS NULL
 )
+AND (
+    :content_type = 0 OR 
+    (:content_type = 1 AND M.source < 6000) OR 
+    (:content_type = 2 AND M.source >= 6000)
+)
 ORDER BY max_last_read.history_last_read DESC
 LIMIT :limit OFFSET :offset;
 
@@ -129,6 +139,11 @@ FROM (  -- Check if there's any unread chapters and whether to include read chap
     ON M2._id = unread.manga_id
     WHERE (
         :include_read = 0 OR unread.value > 0
+    )
+    AND (
+        :content_type = 0 OR 
+        (:content_type = 1 AND M2.source < 6000) OR 
+        (:content_type = 2 AND M2.source >= 6000)
     )
     GROUP BY M2._id
     ORDER BY title
@@ -155,6 +170,11 @@ AND C.scanlator = S.name
 WHERE lower(title) LIKE '%' || :search || '%'
 AND (
     :apply_filter = 0 OR S.name IS NULL
+)
+AND (
+    :content_type = 0 OR 
+    (:content_type = 1 AND M.source < 6000) OR 
+    (:content_type = 2 AND M.source >= 6000)
 )
 
 UNION  -- Newly fetched chapter
@@ -190,6 +210,11 @@ AND lower(title) LIKE '%' || :search || '%'
 AND (
     :apply_filter = 0 OR S.name IS NULL
 )
+AND (
+    :content_type = 0 OR 
+    (:content_type = 1 AND M.source < 6000) OR 
+    (:content_type = 2 AND M.source >= 6000)
+)
 
 UNION  -- Newly added manga
 
@@ -219,6 +244,11 @@ JOIN (
 ) AS C
 WHERE favorite = 1
 AND lower(title) LIKE '%' || :search || '%'
+AND (
+    :content_type = 0 OR 
+    (:content_type = 1 AND M.source < 6000) OR 
+    (:content_type = 2 AND M.source >= 6000)
+)
 
 ORDER BY history_last_read DESC
 LIMIT :limit OFFSET :offset;

@@ -339,8 +339,16 @@ fun SwipeRefreshLayout.setStyle() {
 }
 
 fun MaterialButton.resetStrokeColor() {
+    val onSurface = context.getResourceColor(R.attr.colorOnSurface)
+    // Extract HSL values
+    val hsl = FloatArray(3)
+    ColorUtils.colorToHSL(onSurface, hsl)
+    // Reduce saturation to 20% of original (makes outline less vibrant)
+    hsl[1] = hsl[1] * 0.2f
+    // Convert back to RGB and apply 6% alpha (15/255) for very subtle outline
+    val desaturatedColor = ColorUtils.HSLToColor(hsl)
     strokeColor = ColorStateList.valueOf(
-        ColorUtils.setAlphaComponent(context.getResourceColor(R.attr.colorOnSurface), 31),
+        ColorUtils.setAlphaComponent(desaturatedColor, 15),
     )
 }
 

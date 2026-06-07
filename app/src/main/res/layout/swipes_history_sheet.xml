@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:paddingBottom="16dp">
+
+    <!-- Toolbar with title and close button -->
+    <com.google.android.material.appbar.MaterialToolbar
+        android:id="@+id/toolbar"
+        android:layout_width="match_parent"
+        android:layout_height="?attr/actionBarSize"
+        android:elevation="4dp"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:title="Swipe History"
+        app:navigationIcon="@drawable/ic_close_24dp"
+        style="@style/Widget.Material3.Toolbar" />
+
+    <!-- Subtitle explaining the view -->
+    <TextView
+        android:id="@+id/subtitle"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="16dp"
+        android:layout_marginEnd="16dp"
+        android:layout_marginTop="8dp"
+        android:text="Your last 50 swipe decisions"
+        android:textAppearance="@style/TextAppearance.Material3.BodySmall"
+        android:textColor="?attr/colorOnSurfaceVariant"
+        app:layout_constraintTop_toBottomOf="@id/toolbar"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <!-- RecyclerView for history items -->
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/history_recycler"
+        android:layout_width="match_parent"
+        android:layout_height="400dp"
+        android:layout_marginTop="8dp"
+        android:clipToPadding="false"
+        android:paddingTop="8dp"
+        android:paddingBottom="8dp"
+        app:layout_constraintTop_toBottomOf="@id/subtitle"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        tools:listitem="@layout/swipes_history_item"
+        tools:itemCount="10" />
+
+    <!-- Empty state view -->
+    <LinearLayout
+        android:id="@+id/empty_state"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:gravity="center"
+        android:visibility="gone"
+        app:layout_constraintTop_toTopOf="@id/history_recycler"
+        app:layout_constraintBottom_toBottomOf="@id/history_recycler"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="No swipe history yet"
+            android:textAppearance="@style/TextAppearance.Material3.TitleMedium"
+            android:textColor="?attr/colorOnSurfaceVariant" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="Start swiping to see your history here"
+            android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
+            android:textColor="?attr/colorOnSurfaceVariant" />
+
+    </LinearLayout>
+
+    <!-- Clear History Button -->
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/clear_history_button"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:layout_marginBottom="8dp"
+        android:text="Clear History"
+        style="@style/Widget.Material3.Button.TextButton"
+        app:layout_constraintTop_toBottomOf="@id/history_recycler"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+</androidx.constraintlayout.widget.ConstraintLayout>

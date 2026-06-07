@@ -465,7 +465,8 @@ class MangaDetailsController :
                 override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
                     super.onScrolled(recyclerView, dx, dy)
                     if (!isTablet) {
-                        updateToolbarTitleAlpha(isScrollingDown = dy > 0 && !binding.root.context.isTablet())
+                        val isScrollingDown = dy > 0 && !binding.root.context.isTablet()
+                        updateToolbarTitleAlpha(isScrollingDown = isScrollingDown)
                         val atTop = !recyclerView.canScrollVertically(-1)
                         val tY = getHeader()?.binding?.backdrop?.translationY ?: 0f
                         getHeader()?.binding?.backdrop?.translationY = max(0f, tY + dy * 0.25f)
@@ -980,7 +981,7 @@ class MangaDetailsController :
         }
     }
 
-    fun bookmarkChapter(position: Int) {
+    override fun bookmarkChapter(position: Int) {
         val item = adapter?.getItem(position) as? ChapterItem ?: return
         val bookmarked = item.bookmark
         bookmarkChapters(listOf(item), !bookmarked)
@@ -1000,7 +1001,7 @@ class MangaDetailsController :
         (activity as? MainActivity)?.setUndoSnackBar(snack)
     }
 
-    fun toggleReadChapter(position: Int) {
+    override fun toggleReadChapter(position: Int) {
         val preferences = presenter.preferences
         val item = adapter?.getItem(position) as? ChapterItem ?: return
         val chapter = item.chapter
@@ -1055,6 +1056,8 @@ class MangaDetailsController :
 
     private fun openChapter(chapter: Chapter, sharedElement: View? = null) {
         (activity as? AppCompatActivity)?.apply {
+            // Mode Inheritance ensures this controller only sees manga
+            // Novels route through NovelDetailsController instead
             if (sharedElement != null) {
                 val (intent, bundle) = ReaderActivity
                     .newIntentWithTransitionOptions(this, manga!!, chapter, sharedElement)
@@ -1343,22 +1346,26 @@ class MangaDetailsController :
     }
 
     private fun updateToolbarTitleAlpha(@FloatRange(from = 0.0, to = 1.0) alpha: Float? = null, isScrollingDown: Boolean = false) {
-        if ((!isControllerVisible && alpha == null) || isScrollingDown) return
+        if ((!isControllerVisible && alpha == null) || isScrollingDown) {
+            return
+        }
+        
         val scrolledList = binding.recycler
         val toolbarTextView = activityBinding?.toolbar?.toolbarTitle ?: return
+        
+        val layoutManager = scrolledList.layoutManager as LinearLayoutManager
+        val firstVisiblePos = layoutManager.findFirstVisibleItemPosition()
+        val firstCompletelyVisiblePos = layoutManager.findFirstCompletelyVisibleItemPosition()
+        val scrollOffset = scrolledList.computeVerticalScrollOffset()
+        
         val tbAlpha = when {
             isTablet -> 0f
-            // Specific alpha provided
             alpha != null -> alpha
-
-            // First item isn't in view, full opacity
-            ((scrolledList.layoutManager as LinearLayoutManager).findFirstVisibleItemPosition() > 0) -> 1f
-            ((scrolledList.layoutManager as LinearLayoutManager).findFirstCompletelyVisibleItemPosition() == 0) -> 0f
-
-            // Based on scroll amount when first item is in view
-            else -> (scrolledList.computeVerticalScrollOffset() - (20.dpToPx))
-                .coerceIn(0, 255) / 255f
+            (firstVisiblePos > 0) -> 1f
+            (firstCompletelyVisiblePos == 0) -> 0f
+            else -> (scrollOffset - (20.dpToPx)).coerceIn(0, 255) / 255f
         }
+        
         toolbarTextView.setTextColorAlpha((tbAlpha * 255).roundToInt())
     }
 
@@ -1413,6 +1420,10 @@ class MangaDetailsController :
             activityBinding?.appBar?.y = 0f
             colorToolbar(isColor = false, animate = false)
         }
+    }
+    
+    override fun setSwipeRefreshEnabled(enabled: Boolean) {
+        binding.swipeRefresh.isEnabled = enabled
     }
 
     private fun downloadChapters(chapters: List<ChapterItem>) {

@@ -1,6 +1,7 @@
 package yokai.core.di
 
 import android.app.Application
+import android.os.Build
 import androidx.core.content.ContextCompat
 import androidx.sqlite.db.SupportSQLiteDatabase
 import app.cash.sqldelight.db.SqlDriver
@@ -10,19 +11,26 @@ import com.chuckerteam.chucker.api.ChuckerCollector
 import com.chuckerteam.chucker.api.ChuckerInterceptor
 import eu.kanade.tachiyomi.BuildConfig
 import eu.kanade.tachiyomi.core.storage.AndroidStorageFolderProvider
+import eu.kanade.tachiyomi.data.cache.BrowseExtensionCache
 import eu.kanade.tachiyomi.data.cache.ChapterCache
 import eu.kanade.tachiyomi.data.cache.CoverCache
+import eu.kanade.tachiyomi.data.cache.MangaEntityCache
+import eu.kanade.tachiyomi.data.cache.SourcePageCache
 import eu.kanade.tachiyomi.data.download.DownloadCache
 import eu.kanade.tachiyomi.data.download.DownloadManager
 import eu.kanade.tachiyomi.data.download.DownloadProvider
+import eu.kanade.tachiyomi.data.download.novel.NovelDownloadManager
 import eu.kanade.tachiyomi.data.library.CustomMangaManager
 import eu.kanade.tachiyomi.data.track.TrackManager
 import eu.kanade.tachiyomi.extension.ExtensionManager
+import eu.kanade.tachiyomi.extension.novel.NovelExtensionManager
 import eu.kanade.tachiyomi.network.JavaScriptEngine
+import yokai.source.novel.NovelProviderRegistry
 import eu.kanade.tachiyomi.network.NetworkHelper
 import eu.kanade.tachiyomi.source.SourceManager
 import eu.kanade.tachiyomi.util.chapter.ChapterFilter
 import eu.kanade.tachiyomi.util.manga.MangaShortcutManager
+import androidx.sqlite.db.framework.FrameworkSQLiteOpenHelperFactory
 import io.requery.android.database.sqlite.RequerySQLiteOpenHelperFactory
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.protobuf.ProtoBuf
@@ -52,7 +60,14 @@ fun appModule(app: Application) = module {
             // } else {
             //     RequerySQLiteOpenHelperFactory()
             // },
-            factory = RequerySQLiteOpenHelperFactory(),
+            factory = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                // Use Framework SQLite driver for Android 8+ (SDK 26+) to avoid libsqlite3x.so 16KB alignment issues
+                // Framework driver is built into Android and already 16KB-aligned
+                FrameworkSQLiteOpenHelperFactory()
+            } else {
+                // Fallback to Requery for Android 7 and below (SDK 23-25)
+                RequerySQLiteOpenHelperFactory()
+            },
             callback = object : AndroidSqliteDriver.Callback(Database.Schema) {
                 override fun onOpen(db: SupportSQLiteDatabase) {
                     super.onOpen(db)
@@ -98,6 +113,12 @@ fun appModule(app: Application) = module {
 
     single { CoverCache(app) }
 
+    single { SourcePageCache(app) }
+    
+    single { MangaEntityCache() }
+    
+    single { BrowseExtensionCache(app) }
+
     single {
         NetworkHelper(
             app,
@@ -116,14 +137,24 @@ fun appModule(app: Application) = module {
         }
     }
 
+    // OkHttpClient from NetworkHelper for metadata enhancement
+    single<okhttp3.OkHttpClient> { get<NetworkHelper>().cloudflareClient }
+
     single { JavaScriptEngine(app) }
 
-    single { SourceManager(app, get()) }
+    // Extension managers must be registered before SourceManager
     single { ExtensionManager(app) }
+    single { NovelExtensionManager(app) }
+    
+    // SourceManager observes both manga and novel extension flows
+    single { SourceManager(app, get<ExtensionManager>(), get<NovelExtensionManager>(), get<NetworkHelper>()) }
 
     single { DownloadProvider(app) }
     single { DownloadManager(app) }
     single { DownloadCache(app) }
+    
+    // Novel download system
+    single { NovelDownloadManager(app) }
 
     single { CustomMangaManager(app) }
 
@@ -158,6 +189,19 @@ fun appModule(app: Application) = module {
     single { StorageManager(app, get()) }
 
     single { SplashState() }
+
+    // Metadata Enhancement Components (Phase 1-4)
+    single<yokai.domain.metadata.MetadataRepository> { 
+        yokai.data.metadata.MetadataRepositoryImpl(get(), get()) 
+    }
+    single { eu.kanade.tachiyomi.data.metadata.anilist.AnilistMetadataClient(get()) }
+    single { eu.kanade.tachiyomi.data.metadata.mangadex.MangaDexMetadataClient(get()) }
+    single { eu.kanade.tachiyomi.data.metadata.mal.MalMetadataClient(get()) }
+    single { eu.kanade.tachiyomi.data.metadata.kitsu.KitsuMetadataClient(get()) }
+    single { eu.kanade.tachiyomi.data.metadata.MetadataMatcher() }
+    single { 
+        eu.kanade.tachiyomi.data.metadata.MetadataEnhancementService(get(), get(), get(), get(), get(), get()) 
+    }
 }
 
 // REF: https://github.com/jobobby04/TachiyomiSY/blob/26cfb4811fef4059fb7e8e03361c141932fec6b5/app/src/main/java/eu/kanade/tachiyomi/di/AppModule.kt#L177C1-L192C2
@@ -173,5 +217,11 @@ fun initExpensiveComponents(app: Application) {
         Injekt.get<DownloadManager>()
 
         Injekt.get<CustomMangaManager>()
+        
+        // Initialize novel extension system and connect to NovelProviderRegistry
+        val novelExtensionManager = Injekt.get<NovelExtensionManager>()
+        NovelProviderRegistry.registerExtensionSourcesProvider {
+            novelExtensionManager.getInstalledSources()
+        }
     }
 }

@@ -6,7 +6,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import cafe.adriel.voyager.navigator.LocalNavigator
 import com.mikepenz.aboutlibraries.ui.compose.m3.LibrariesContainer
-import com.mikepenz.aboutlibraries.ui.compose.m3.util.htmlReadyLicenseContent
 import dev.icerock.moko.resources.compose.stringResource
 import eu.kanade.tachiyomi.util.compose.LocalBackPress
 import eu.kanade.tachiyomi.util.compose.currentOrThrow
@@ -35,7 +34,7 @@ class AboutLicenseScreen : Screen() {
                         AboutLibraryLicenseScreen(
                             it.name,
                             it.website,
-                            it.licenses.firstOrNull()?.htmlReadyLicenseContent.orEmpty(),
+                            it.licenses.firstOrNull()?.licenseContent.orEmpty(),
                         ),
                     )
                 }

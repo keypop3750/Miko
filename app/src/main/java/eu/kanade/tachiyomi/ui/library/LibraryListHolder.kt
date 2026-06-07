@@ -5,12 +5,15 @@ import android.view.ViewGroup
 import androidx.core.view.isVisible
 import androidx.core.view.updateLayoutParams
 import coil3.dispose
+import coil3.imageLoader
 import eu.kanade.tachiyomi.databinding.MangaListItemBinding
 import eu.kanade.tachiyomi.util.lang.highlightText
 import eu.kanade.tachiyomi.util.system.dpToPx
 import eu.kanade.tachiyomi.util.view.setCards
 import yokai.i18n.MR
+import yokai.util.coil.asTarget
 import yokai.util.coil.loadManga
+import yokai.util.coil.loadNovel
 import yokai.util.lang.getString
 
 /**
@@ -67,8 +70,6 @@ class LibraryListHolder(
             return
         }
 
-        if (item !is LibraryMangaItem) error("${item::class.qualifiedName} is not a valid item")
-
         binding.constraintLayout.updateLayoutParams<ViewGroup.MarginLayoutParams> {
             height = 52.dpToPx
         }
@@ -76,32 +77,68 @@ class LibraryListHolder(
         binding.card.isVisible = true
         binding.title.textAlignment = View.TEXT_ALIGNMENT_TEXT_START
 
-        // Update the binding.title of the manga.
-        binding.title.text = item.manga.manga.title.highlightText(item.filter, color)
-        setUnreadBadge(binding.unreadDownloadBadge.badgeView, item)
+        // Handle both manga and novel items
+        when (item) {
+            is LibraryMangaItem -> {
+                // Update the binding.title of the manga.
+                binding.title.text = item.manga.manga.title.highlightText(item.filter, color)
+                setUnreadBadge(binding.unreadDownloadBadge.badgeView, item)
 
-        val authorArtist =
-            if (item.manga.manga.author == item.manga.manga.artist || item.manga.manga.artist.isNullOrBlank()) {
-                item.manga.manga.author?.trim() ?: ""
-            } else {
-                listOfNotNull(
-                    item.manga.manga.author?.trim()?.takeIf { it.isNotBlank() },
-                    item.manga.manga.artist?.trim()?.takeIf { it.isNotBlank() },
-                ).joinToString(", ")
+                val authorArtist =
+                    if (item.manga.manga.author == item.manga.manga.artist || item.manga.manga.artist.isNullOrBlank()) {
+                        item.manga.manga.author?.trim() ?: ""
+                    } else {
+                        listOfNotNull(
+                            item.manga.manga.author?.trim()?.takeIf { it.isNotBlank() },
+                            item.manga.manga.artist?.trim()?.takeIf { it.isNotBlank() },
+                        ).joinToString(", ")
+                    }
+
+                binding.subtitle.text = authorArtist.highlightText(item.filter, color)
+                binding.title.maxLines = 2
+                binding.title.post {
+                    val hasAuthorInFilter =
+                        item.filter.isNotBlank() && authorArtist.contains(item.filter, true)
+                    binding.subtitle.isVisible = binding.title.lineCount <= 1 || hasAuthorInFilter
+                    binding.title.maxLines = if (hasAuthorInFilter) 1 else 2
+                }
+
+                // Update the cover.
+                binding.coverThumbnail.dispose()
+                binding.coverThumbnail.loadManga(item.manga.manga)
             }
+            is LibraryNovelItem -> {
+                // Update the title of the novel
+                binding.title.text = item.novel.title.highlightText(item.filter, color)
+                
+                // Show unread badge but hide download count (no green badge)
+                binding.unreadDownloadBadge.badgeView.isVisible = item.unreadCount > 0
+                if (item.unreadCount > 0) {
+                    binding.unreadDownloadBadge.unreadText.text = item.unreadCount.toString()
+                    binding.unreadDownloadBadge.unreadText.isVisible = true
+                } else {
+                    binding.unreadDownloadBadge.unreadText.isVisible = false
+                }
+                // Always hide download count for novels
+                binding.unreadDownloadBadge.downloadText.isVisible = false
 
-        binding.subtitle.text = authorArtist.highlightText(item.filter, color)
-        binding.title.maxLines = 2
-        binding.title.post {
-            val hasAuthorInFilter =
-                item.filter.isNotBlank() && authorArtist.contains(item.filter, true)
-            binding.subtitle.isVisible = binding.title.lineCount <= 1 || hasAuthorInFilter
-            binding.title.maxLines = if (hasAuthorInFilter) 1 else 2
+                // Display author as subtitle
+                val author = item.novel.author?.trim() ?: ""
+                binding.subtitle.text = author.highlightText(item.filter, color)
+                binding.title.maxLines = 2
+                binding.title.post {
+                    val hasAuthorInFilter =
+                        item.filter.isNotBlank() && author.contains(item.filter, true)
+                    binding.subtitle.isVisible = binding.title.lineCount <= 1 || hasAuthorInFilter
+                    binding.title.maxLines = if (hasAuthorInFilter) 1 else 2
+                }
+
+                // Update the cover - use novel extension with color extraction
+                binding.coverThumbnail.dispose()
+                binding.coverThumbnail.loadNovel(item.novel)
+            }
+            else -> error("${item::class.qualifiedName} is not a valid item")
         }
-
-        // Update the cover.
-        binding.coverThumbnail.dispose()
-        binding.coverThumbnail.loadManga(item.manga.manga)
     }
 
     override fun onActionStateChanged(position: Int, actionState: Int) {
