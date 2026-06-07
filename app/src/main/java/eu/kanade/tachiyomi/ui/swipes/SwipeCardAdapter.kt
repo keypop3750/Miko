@@ -263,6 +263,22 @@ class SwipeCardAdapter : RecyclerView.Adapter<SwipeCardAdapter.SwipeCardViewHold
         private fun setupScrollEffects() {
             // Reset lastScrollY when setting up (for new card binding)
             lastScrollY = 0
+
+            // Prevent CardStackView from intercepting vertical scrolls on this card
+            // so the NestedScrollView can scroll the description properly
+            binding.scrollView.setOnTouchListener { _, event ->
+                when (event.actionMasked) {
+                    android.view.MotionEvent.ACTION_DOWN,
+                    android.view.MotionEvent.ACTION_MOVE -> {
+                        binding.scrollView.parent?.requestDisallowInterceptTouchEvent(true)
+                    }
+                    android.view.MotionEvent.ACTION_UP,
+                    android.view.MotionEvent.ACTION_CANCEL -> {
+                        binding.scrollView.parent?.requestDisallowInterceptTouchEvent(false)
+                    }
+                }
+                false
+            }
             
             binding.scrollView.setOnScrollChangeListener { _, _, scrollY, _, oldScrollY ->
                 val maxScroll = 400f

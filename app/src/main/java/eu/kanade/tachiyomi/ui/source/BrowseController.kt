@@ -437,6 +437,8 @@ class BrowseController :
         if (isControllerVisible) {
             val activity = (activity as? MainActivity) ?: return
             (activity as? MainActivity)?.setStatusBarColorTransparent(showingExtensions)
+            // Hide main floating search bar when Extensions bottom sheet is open
+            (activity as? MainActivity)?.setFloatingToolbar(!showingExtensions)
             updateSheetMenu()
         }
     }

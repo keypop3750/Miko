@@ -191,7 +191,7 @@ class SwipesPresenter(
                 } else {
                     currentFilters.enabledSourceIds
                 }
-                
+
                 val recommendations = repository.fetchRecommendations(
                     count = preloadCount,
                     excludeNsfw = currentFilters.excludeNsfw,
@@ -206,11 +206,11 @@ class SwipesPresenter(
                     _cards.value = emptyList()
                 } else {
                     Logger.d { "📱 [SWIPES] Loaded ${recommendations.size} recommendations from sources" }
-                    
+
                     // Convert MangaWithSource to SwipeCardItem (basic info only)
                     val cardItems = recommendations.map { mangaWithSource ->
                         val statusText = repository.getStatusText(mangaWithSource.manga.status)
-                        
+
                         SwipeCardItem.fromSManga(
                             manga = mangaWithSource.manga,
                             sourceId = mangaWithSource.sourceId,
@@ -219,12 +219,13 @@ class SwipesPresenter(
                             currentMangaUrls.add(it.url)
                         }
                     }
-                    
-                    // DON'T emit cards yet - prefetch first!
-                    // _cards.value = cardItems  // REMOVED
-                    
-                    // Prefetch details for ALL cards BEFORE showing UI
-                    Logger.d { "📱 [SWIPES] Prefetching full details for all ${cardItems.size} cards (parallel batches)..." }
+
+                    // SHOW CARDS IMMEDIATELY with basic info - don't wait for details
+                    _cards.value = cardItems
+                    _uiState.value = SwipesUiState.Success(cardItems.size)
+                    Logger.d { "📱 [SWIPES] UI visible with ${cardItems.size} cards (details loading in background)" }
+
+                    // Prefetch details in background WITHOUT blocking UI
                     prefetchDetailsForInitialCards(cardItems)
                 }
             } catch (e: Exception) {
@@ -500,131 +501,53 @@ class SwipesPresenter(
      */
     private fun prefetchDetailsForInitialCards(cards: List<SwipeCardItem>) {
         presenterScope.launch {
-            Logger.d { "📱 [SWIPES] 🚀 BATCH LOADING: Fetching ${cards.size} cards (MangaDetailsPresenter pattern)" }
-            
-            data class CardWithTime(val card: SwipeCardItem, val fetchTimeMs: Long)
-            
-            // Semaphore to limit concurrency (prevents cache contention)
-            val maxConcurrent = 8
+            Logger.d { "📱 [SWIPES] 🚀 BACKGROUND LOADING: Fetching details for ${cards.size} cards" }
+
+            // Semaphore to limit concurrency (prevents rate limiting)
+            val maxConcurrent = 4
             val semaphore = kotlinx.coroutines.sync.Semaphore(maxConcurrent)
-            
-            var totalPrefetched = 0
-            var totalFiltered = 0
-            var totalFailed = 0
-            
-            // Keep loading state until ALL tasks complete
-            _uiState.value = SwipesUiState.Loading
-            
-            // Helper function to fetch a single card with concurrency control
-            suspend fun fetchCardWithSemaphore(card: SwipeCardItem): CardWithTime? {
-                semaphore.acquire()
-                try {
-                    val startTime = System.currentTimeMillis()
-                    
-                    val detailedCard = withTimeoutOrNull(8.seconds) {
-                        fetchDetailsSync(card)
-                    }
-                    
-                    if (detailedCard == null) {
-                        totalFailed++
-                        return null
-                    }
-                    
-                    val fetchTime = System.currentTimeMillis() - startTime
-                    
-                    // FILTER 1: Check if fetch failed (no metadata populated)
-                    val hasValidMetadata = detailedCard.description.isNotBlank() || 
-                                           detailedCard.tags.isNotBlank() ||
-                                           detailedCard.author.isNotBlank()
-                    
-                    if (!hasValidMetadata) {
-                        Logger.w { "📱 [SWIPES] ❌ Filtered out '${detailedCard.title}' - no metadata" }
-                        totalFiltered++
-                        return null
-                    }
-                    
-                    // FILTER 2: RE-CHECK NSFW with full tags
-                    val manga = eu.kanade.tachiyomi.source.model.SManga.create().apply {
-                        url = detailedCard.url
-                        title = detailedCard.title
-                        author = detailedCard.author
-                        description = detailedCard.description
-                        genre = detailedCard.tags
-                        thumbnail_url = detailedCard.coverUrl
-                    }
-                    
-                    if (currentFilters.excludeNsfw && repository.isNsfwPublic(manga)) {
-                        Logger.w { "📱 [SWIPES] 🔞 NSFW filtered: '${detailedCard.title}'" }
-                        totalFiltered++
-                        return null
-                    }
-                    
-                    detailsCache[card.url] = detailedCard
-                    totalPrefetched++
-                    return CardWithTime(detailedCard, fetchTime)
-                } catch (e: Exception) {
-                    totalFailed++
-                    if (totalFailed <= 3) {
-                        Logger.w(e) { "📱 [SWIPES] ⚠️ Failed: '${card.title}' - ${e.message}" }
-                    }
-                    return null
-                } finally {
-                    semaphore.release()
-                }
-            }
-            
-            // ═══════════════════════════════════════════════════════════
-            // BATCH FETCH: Launch all async tasks, then awaitAll()
-            // Pattern: MangaDetailsPresenter.kt:233-240
-            // ═══════════════════════════════════════════════════════════
-            Logger.d { "📱 [SWIPES] ⏳ Launching ${cards.size} async fetch tasks (max $maxConcurrent concurrent)..." }
-            
-            val allResults = cards.map { card ->
+
+            // Launch all fetches concurrently but don't block UI
+            cards.map { card ->
                 async(Dispatchers.IO) {
-                    fetchCardWithSemaphore(card)
+                    semaphore.acquire()
+                    try {
+                        val detailedCard = withTimeoutOrNull(6.seconds) {
+                            fetchDetailsSync(card)
+                        }
+
+                        if (detailedCard == null) return@async null
+
+                        // Only keep cards that have at least some useful info
+                        val hasValidMetadata = detailedCard.description.isNotBlank() ||
+                                               detailedCard.tags.isNotBlank() ||
+                                               detailedCard.author.isNotBlank() ||
+                                               detailedCard.chapterCount > 0
+
+                        if (!hasValidMetadata) return@async null
+
+                        detailsCache[card.url] = detailedCard
+                        detailedCard
+                    } catch (e: Exception) {
+                        null
+                    } finally {
+                        semaphore.release()
+                    }
                 }
-            }.awaitAll().filterNotNull()  // ← CRITICAL: Blocks until ALL complete
-            
-            // ═══════════════════════════════════════════════════════════
-            // SINGLE UI UPDATE: All cards ready, emit once
-            // ═══════════════════════════════════════════════════════════
-            if (allResults.isNotEmpty()) {
-                val finalCards = allResults
-                    .sortedBy { it.fetchTimeMs }
-                    .map { it.card }
-                
-                    // METADATA ENHANCEMENT (Phase 1): Enhance cards with AniList metadata
-                Logger.d { "📊 [METADATA] Enhancing ${finalCards.size} cards with metadata..." }
-                Logger.d { "📊 [METADATA] MetadataEnhancementService instance: $metadataEnhancementService" }
-                val enhancedCards = try {
-                    Logger.d { "📊 [METADATA] Calling enhanceCards()..." }
-                    val result = metadataEnhancementService.enhanceCards(finalCards)
-                    Logger.d { "📊 [METADATA] Enhancement completed successfully, ${result.count { it.metadataEnhanced }} cards enhanced" }
-                    result
-                } catch (e: Exception) {
-                    Logger.e(e) { "📊 [METADATA] Enhancement failed with exception: ${e.message}" }
-                    finalCards // Fallback to unenhanced on error
-                }                // SINGLE emission - no incremental updates!
-                _cards.value = enhancedCards
-                _uiState.value = SwipesUiState.Success(enhancedCards.size)
-                
-                val successRate = ((totalPrefetched.toFloat() / cards.size) * 100).toInt()
-                val enhancedCount = enhancedCards.count { it.metadataEnhanced }
-                Logger.d { 
-                    "📱 [SWIPES] 🎉 LOADING COMPLETE - UI NOW VISIBLE! " +
-                    "(${enhancedCount}/${enhancedCards.size} metadata-enhanced)"
+            }.forEach { deferred ->
+                // Process each card as it completes - update UI incrementally
+                val detailedCard = deferred.await()
+                if (detailedCard != null) {
+                    val currentCards = _cards.value.toMutableList()
+                    val index = currentCards.indexOfFirst { it.url == detailedCard.url }
+                    if (index >= 0) {
+                        currentCards[index] = detailedCard
+                        _cards.value = currentCards
+                    }
                 }
-                Logger.d { "📱 [SWIPES]   ✅ Success: $totalPrefetched/${cards.size} ($successRate%)" }
-                Logger.d { "📱 [SWIPES]   ❌ Filtered: $totalFiltered NSFW/no-metadata" }
-                Logger.d { "📱 [SWIPES]   ⚠️ Failed: $totalFailed errors" }
-                Logger.d { "📱 [SWIPES]   ⚡ Fastest: ${allResults.minOfOrNull { it.fetchTimeMs }}ms" }
-                Logger.d { "📱 [SWIPES]   🐌 Slowest: ${allResults.maxOfOrNull { it.fetchTimeMs }}ms" }
-                Logger.d { "📱 [SWIPES]   📊 Final queue: ${finalCards.size} cards ready" }
-            } else {
-                // All cards failed/filtered
-                _uiState.value = SwipesUiState.NoMoreCards
-                Logger.w { "📱 [SWIPES] ❌ No cards available after filtering" }
             }
+
+            Logger.d { "📱 [SWIPES] Background detail loading complete" }
         }
     }
     
