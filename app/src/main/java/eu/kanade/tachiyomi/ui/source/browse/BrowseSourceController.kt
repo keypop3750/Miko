@@ -262,12 +262,20 @@ open class BrowseSourceController(bundle: Bundle) :
                 if (source is CatalogueSource) {
                     presenter.source = source
                     logger.d { "🚀 [PRE-FETCH] Source initialized: ${source.name}" }
+                    // CRITICAL: Set mode BEFORE view is created to avoid theme flash
+                    if (source.isNovelSource()) {
+                        ModeManager.setMode(ContentType.NOVEL)
+                        logger.d { "🚀 [PRE-FETCH] Set mode to NOVEL for ${source.name}" }
+                    } else {
+                        ModeManager.setMode(ContentType.MANGA)
+                        logger.d { "🚀 [PRE-FETCH] Set mode to MANGA for ${source.name}" }
+                    }
                 } else {
                     logger.w { "🚀 [PRE-FETCH] Source is not a CatalogueSource, skipping pre-fetch" }
                     return
                 }
             }
-            
+
             // Start loading the first page immediately
             // This will populate the pager's flow before the view is even created
             logger.d { "🚀 [PRE-FETCH] Calling presenter.restartPager() to start data loading..." }

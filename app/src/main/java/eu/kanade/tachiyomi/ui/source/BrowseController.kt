@@ -55,8 +55,6 @@ import eu.kanade.tachiyomi.ui.setting.controllers.SettingsSourcesController
 import eu.kanade.tachiyomi.ui.source.browse.BrowseSourceController
 import eu.kanade.tachiyomi.ui.source.globalsearch.GlobalSearchController
 import eu.kanade.tachiyomi.util.system.dpToPx
-import yokai.core.content.ContentType
-import yokai.core.mode.ModeManager
 import eu.kanade.tachiyomi.util.system.getBottomGestureInsets
 import eu.kanade.tachiyomi.util.system.getResourceColor
 import eu.kanade.tachiyomi.util.system.openInBrowser
@@ -710,11 +708,6 @@ class BrowseController :
      * Opens a catalogue with the given controller.
      */
     private fun openCatalogue(source: CatalogueSource, controller: BrowseSourceController) {
-        // Auto-switch to novel mode when opening a novel source
-        if (source is eu.kanade.tachiyomi.source.novel.NovelSourceWrapper) {
-            ModeManager.setMode(ContentType.NOVEL)
-        }
-
         if (!preferences.incognitoMode().get()) {
             preferences.lastUsedCatalogueSource().set(source.id)
             if (source !is LocalSource) {
@@ -727,7 +720,7 @@ class BrowseController :
                     .set(sortedList.take(2).toSet())
             }
         }
-
+        
         activityBinding?.searchToolbar?.searchQueryHint = "Search ${source.name}"
         router.pushController(controller.withFadeTransaction())
     }

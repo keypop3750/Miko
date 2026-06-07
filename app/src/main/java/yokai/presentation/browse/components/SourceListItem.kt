@@ -199,8 +199,9 @@ private fun SourceIcon(
     
     if (imageBitmap != null) {
         Image(
-            painter = BitmapPainter(imageBitmap!!.asImageBitmap()),
+            painter = BitmapPainter(imageBitmap!!.asImageBitmap(), filterQuality = androidx.compose.ui.graphics.FilterQuality.Low),
             contentDescription = "$sourceName icon",
+            contentScale = androidx.compose.ui.layout.ContentScale.Crop,
             modifier = modifier.clip(CircleShape)
         )
     } else {
