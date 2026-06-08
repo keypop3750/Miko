@@ -7,18 +7,18 @@
     android:layout_height="match_parent"
     android:background="?attr/background">
 
-    <!-- Backdrop solid color background -->
+    <!-- Backdrop solid color background - full height so gradient has consistent base everywhere -->
     <View
         android:id="@+id/true_backdrop"
         android:layout_width="match_parent"
-        android:layout_height="420dp"
+        android:layout_height="match_parent"
         android:visibility="gone" />
 
-    <!-- Backdrop blurred cover image -->
+    <!-- Backdrop blurred cover image - full height so there's no hard cutoff at 420dp -->
     <ImageView
         android:id="@+id/backdrop"
         android:layout_width="match_parent"
-        android:layout_height="420dp"
+        android:layout_height="match_parent"
         android:alpha="0.15"
         android:scaleType="centerCrop"
         android:visibility="gone"
