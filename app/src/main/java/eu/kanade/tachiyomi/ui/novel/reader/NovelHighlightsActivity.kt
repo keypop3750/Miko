@@ -152,12 +152,16 @@ class NovelHighlightsActivity : AppCompatActivity() {
         val bgColor = readerBg
             ?: (binding.coordinator.background as? android.graphics.drawable.ColorDrawable)?.color
             ?: Color.WHITE
+        // Use bgColor@0-alpha instead of Color.TRANSPARENT so the RGB channel
+        // stays consistent throughout the gradient. Color.TRANSPARENT is black@0
+        // which causes dark muddy interpolation when alpha is very low.
+        val transparentBg = ColorUtils.setAlphaComponent(bgColor, 0)
         backdropGradient.background = GradientDrawable(
             GradientDrawable.Orientation.TOP_BOTTOM,
             intArrayOf(
-                Color.TRANSPARENT,      // 0.00 – image fully visible at top
-                Color.TRANSPARENT,      // 0.11 – keep image clear longer
-                Color.TRANSPARENT,      // 0.22
+                transparentBg,      // 0.00 – image fully visible, same hue as bg
+                transparentBg,      // 0.11
+                transparentBg,      // 0.22
                 ColorUtils.setAlphaComponent(bgColor, 25),   // 0.33 – faint bg begins
                 ColorUtils.setAlphaComponent(bgColor, 60),   // 0.44
                 ColorUtils.setAlphaComponent(bgColor, 110),  // 0.55 – mid transition

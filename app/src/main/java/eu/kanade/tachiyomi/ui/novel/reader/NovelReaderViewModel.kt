@@ -1025,8 +1025,10 @@ class NovelReaderViewModel(
                 )
                 novelRepository.updateChapter(updatedChapter)
 
+                val threshold = (totalChars * 0.95).toInt()
+                android.util.Log.d("NovelReaderViewModel", "Read check: pos=$posToSave total=$totalChars threshold=$threshold (95%) willMark=${posToSave >= threshold}")
                 // Only mark as read if user has scrolled past 95% of the chapter
-                if (totalChars > 0 && posToSave >= totalChars * 0.95) {
+                if (totalChars > 0 && posToSave >= threshold) {
                     novelRepository.markChapterRead(chapter.id, true)
                     android.util.Log.d("NovelReaderViewModel", "Auto-marked chapter ${chapter.id} as read (progress >= 95%)")
                 }

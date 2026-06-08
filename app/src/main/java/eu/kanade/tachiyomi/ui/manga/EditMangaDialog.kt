@@ -512,7 +512,138 @@ class EditMangaDialog : DialogController {
 
     companion object {
         private const val KEY_MANGA = "manga_id"
-        
+
+        /**
+         * Static migration helper usable from both Controller and Activity dialogs.
+         */
+        private fun performMigrate(
+            context: Context,
+            manga: Manga,
+            binding: EditMangaDialogBinding,
+            mode: MigrateMode,
+            onPosterUrl: (String?) -> Unit,
+        ) {
+            val sourceManager = Injekt.get<SourceManager>()
+            val mangaSources = sourceManager.getCatalogueSources()
+                .filter { it !is eu.kanade.tachiyomi.source.novel.NovelSourceWrapper }
+                .filter { it.id != manga.source }
+                .sortedBy { it.name }
+                .toList()
+
+            if (mangaSources.isEmpty()) {
+                context.toast("No other manga sources installed")
+                return
+            }
+
+            androidx.appcompat.app.AlertDialog.Builder(context)
+                .setTitle(context.getString(MR.strings.select_source))
+                .setItems(mangaSources.map { it.name }.toTypedArray()) { _, which ->
+                    searchSource(context, mangaSources[which], manga, binding, mode, onPosterUrl)
+                }
+                .setNegativeButton(AR.string.cancel, null)
+                .show()
+        }
+
+        private fun searchSource(
+            context: Context,
+            source: CatalogueSource,
+            manga: Manga,
+            binding: EditMangaDialogBinding,
+            mode: MigrateMode,
+            onPosterUrl: (String?) -> Unit,
+        ) {
+            val progressDialog = android.app.ProgressDialog(context).apply {
+                setMessage(context.getString(MR.strings.searching_))
+                setCancelable(false)
+                show()
+            }
+            GlobalScope.launch(Dispatchers.IO) {
+                try {
+                    val page = source.getSearchManga(1, manga.title, FilterList())
+                    withContext(Dispatchers.Main) {
+                        progressDialog.dismiss()
+                        if (page.mangas.isEmpty()) {
+                            context.toast(context.getString(MR.strings.no_results_found))
+                            return@withContext
+                        }
+                        showSearchResults(context, source, page.mangas, manga, binding, mode, onPosterUrl)
+                    }
+                } catch (e: Exception) {
+                    withContext(Dispatchers.Main) {
+                        progressDialog.dismiss()
+                        context.toast("Search failed: ${e.message}")
+                    }
+                }
+            }
+        }
+
+        private fun showSearchResults(
+            context: Context,
+            source: CatalogueSource,
+            results: List<SManga>,
+            manga: Manga,
+            binding: EditMangaDialogBinding,
+            mode: MigrateMode,
+            onPosterUrl: (String?) -> Unit,
+        ) {
+            androidx.appcompat.app.AlertDialog.Builder(context)
+                .setTitle("Results from ${source.name}")
+                .setItems(results.map { it.title }.toTypedArray()) { _, which ->
+                    fetchAndApply(context, source, results[which], manga, binding, mode, onPosterUrl)
+                }
+                .setNegativeButton(AR.string.cancel, null)
+                .show()
+        }
+
+        private fun fetchAndApply(
+            context: Context,
+            source: CatalogueSource,
+            selected: SManga,
+            manga: Manga,
+            binding: EditMangaDialogBinding,
+            mode: MigrateMode,
+            onPosterUrl: (String?) -> Unit,
+        ) {
+            val progressDialog = android.app.ProgressDialog(context).apply {
+                setMessage("Fetching details…")
+                setCancelable(false)
+                show()
+            }
+            GlobalScope.launch(Dispatchers.IO) {
+                try {
+                    val details = source.getMangaDetails(selected)
+                    withContext(Dispatchers.Main) {
+                        progressDialog.dismiss()
+                        when (mode) {
+                            MigrateMode.COVER -> {
+                                onPosterUrl(details.thumbnail_url)
+                                binding.mangaCover.load(details.thumbnail_url)
+                                context.toast(context.getString(MR.strings.migrate_cover_applied))
+                            }
+                            MigrateMode.INFO -> {
+                                binding.title.setText(details.title)
+                                binding.mangaAuthor.setText(details.author)
+                                binding.mangaArtist.setText(details.artist)
+                                binding.mangaDescription.setText(details.description)
+                                details.genre?.let {
+                                    val genres = it.split(",").map { g -> g.trim() }
+                                    // Simplified genre tag application for Activity dialog
+                                    binding.mangaGenresTags.removeAllViews()
+                                }
+                                binding.mangaStatus.setSelection(details.status.coerceIn(0, 5))
+                                context.toast(context.getString(MR.strings.migrate_info_applied))
+                            }
+                        }
+                    }
+                } catch (e: Exception) {
+                    withContext(Dispatchers.Main) {
+                        progressDialog.dismiss()
+                        context.toast("Failed to fetch details: ${e.message}")
+                    }
+                }
+            }
+        }
+
         /**
          * Creates a simplified Activity-compatible edit manga dialog.
          * This bypasses the Conductor router requirement by directly using MaterialAlertDialog.
@@ -633,9 +764,12 @@ class EditMangaDialog : DialogController {
                 willResetCover = true
             }
             
-            // Migrate buttons hidden in Activity dialog (simplified context)
-            binding.migrateCover.isVisible = false
-            binding.migrateInfo.isVisible = false
+            // Migrate buttons for Activity dialog
+            var migratedPosterUrl: String? = null
+            binding.migrateCover.isVisible = !isLocal
+            binding.migrateInfo.isVisible = !isLocal
+            binding.migrateCover.setOnClickListener { performMigrate(activity, manga, binding, MigrateMode.COVER) { url -> migratedPosterUrl = url } }
+            binding.migrateInfo.setOnClickListener { performMigrate(activity, manga, binding, MigrateMode.INFO) { url -> migratedPosterUrl = url } }
             
             // Override positive button click to save changes
             dialog.setOnShowListener {
