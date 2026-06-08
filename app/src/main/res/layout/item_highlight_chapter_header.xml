@@ -1,11 +1,27 @@
 <?xml version="1.0" encoding="utf-8"?>
-<TextView xmlns:android="http://schemas.android.com/apk/res/android"
-    android:id="@+id/chapter_header_title"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:gravity="center_vertical"
     android:paddingTop="16dp"
     android:paddingBottom="8dp"
-    android:paddingHorizontal="4dp"
-    android:textAppearance="?textAppearanceTitleMedium"
-    android:textColor="@android:color/white"
-    android:textStyle="bold" />
+    android:paddingHorizontal="4dp">
+
+    <View
+        android:id="@+id/chapter_header_accent_bar"
+        android:layout_width="4dp"
+        android:layout_height="24dp"
+        android:layout_marginEnd="10dp"
+        android:background="@android:color/white" />
+
+    <TextView
+        android:id="@+id/chapter_header_title"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:textAppearance="?textAppearanceTitleMedium"
+        android:textColor="@android:color/white"
+        android:textStyle="bold" />
+
+</LinearLayout>

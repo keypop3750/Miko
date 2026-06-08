@@ -105,7 +105,7 @@ class NovelSelectionActionModeCallback(
         val container = LinearLayout(ctx).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            setPadding((14 * density).toInt(), (10 * density).toInt(), (14 * density).toInt(), (10 * density).toInt())
+            setPadding((18 * density).toInt(), (12 * density).toInt(), (18 * density).toInt(), (12 * density).toInt())
             background = createPopupBackground(density)
         }
         popupContainer = container
@@ -189,17 +189,19 @@ class NovelSelectionActionModeCallback(
     ) {
         container.removeAllViews()
 
-        val iconSize = (16 * density).toInt()
-        val iconPadding = (10 * density).toInt()
+        val iconSize = (22 * density).toInt()
+        val iconPadding = (14 * density).toInt()
         val tint = Color.WHITE
 
-        fun addIcon(iconRes: Int, onClick: () -> Unit) {
+        fun addIcon(iconRes: Int, isMore: Boolean = false, onClick: () -> Unit) {
             val iv = ImageView(container.context).apply {
                 layoutParams = LinearLayout.LayoutParams(iconSize, iconSize).apply {
                     marginEnd = iconPadding
                 }
                 setImageResource(iconRes)
                 setColorFilter(tint)
+                scaleType = if (isMore) ImageView.ScaleType.FIT_XY else ImageView.ScaleType.FIT_CENTER
+                setPadding(if (isMore) (2 * density).toInt() else 0, 0, if (isMore) (2 * density).toInt() else 0, 0)
                 setOnClickListener { onClick() }
             }
             container.addView(iv)
@@ -241,7 +243,7 @@ class NovelSelectionActionModeCallback(
         addDivider()
 
         // More → switch to TTS state
-        addIcon(R.drawable.ic_more_vert_24dp) {
+        addIcon(R.drawable.ic_more_vert_24dp, isMore = true) {
             buildTtsState(container, selectedText, density)
         }
     }

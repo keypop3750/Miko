@@ -384,16 +384,18 @@ class NovelDetailsControllerNew : BaseCoroutineController<NovelDetailsController
                 coverPlaceholderIcon.isVisible = true
                 novelCover.isVisible = false
             } else {
-                // Load the cover - placeholder will be hidden on success
+                // Load the cover - keep novelCover hidden until success to avoid
+                // showing Coil's default placeholder alongside our custom one
                 coverPlaceholder.isVisible = true
                 coverPlaceholderIcon.isVisible = true
-                novelCover.isVisible = true
+                novelCover.isVisible = false
                 novelCover.imageTintList = null
                 novelCover.loadNovel(novel) {
                     listener(
                         onSuccess = { _, _ ->
                             coverPlaceholder.isVisible = false
                             coverPlaceholderIcon.isVisible = false
+                            novelCover.isVisible = true
                             novelCover.scaleType = ImageView.ScaleType.CENTER_CROP
                         },
                         onError = { _, _ ->
@@ -581,17 +583,12 @@ class NovelDetailsControllerNew : BaseCoroutineController<NovelDetailsController
         }
         
         MaterialMenuSheet(activity, items, chapter.title) { _, position ->
-            val adjustedPosition = if (novel.url.isNotBlank()) position else position + 1
-            when (adjustedPosition) {
-                0 -> openChapterInWebView(chapter)
-                1 -> markPreviousAsRead(chapter, read = true)
-                2 -> markPreviousAsRead(chapter, read = false)
-                3 -> {
-                    startRangeMarking(chapter, RangeMode.Read)
-                }
-                4 -> {
-                    startRangeMarking(chapter, RangeMode.Unread)
-                }
+            when (position) {
+                4 -> openChapterInWebView(chapter)
+                0 -> markPreviousAsRead(chapter, read = true)
+                1 -> markPreviousAsRead(chapter, read = false)
+                2 -> startRangeMarking(chapter, RangeMode.Read)
+                3 -> startRangeMarking(chapter, RangeMode.Unread)
             }
             true
         }.show()

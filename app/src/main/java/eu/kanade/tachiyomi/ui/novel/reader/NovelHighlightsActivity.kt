@@ -132,10 +132,18 @@ class NovelHighlightsActivity : AppCompatActivity() {
             backdropGradient.isVisible = false
             trueBackdrop.isVisible = false
         }
+
+        // Apply vibrant cover color to backdrop (like novel detail page does)
+        vibrantColor?.let { color ->
+            trueBackdrop.setBackgroundColor(color)
+            trueBackdrop.isVisible = true
+        }
     }
 
     private fun setupRecyclerView() {
+        val accentColor = vibrantColor ?: ContextCompat.getColor(this, R.color.colorAccent)
         adapter = HighlightsAdapter(
+            accentColor = accentColor,
             onAction = { action, entry, chapterNumber ->
                 when (action) {
                     is HighlightAction.Copy -> {
@@ -214,6 +222,7 @@ class NovelHighlightsActivity : AppCompatActivity() {
     }
 
     class HighlightsAdapter(
+        private val accentColor: Int,
         private val onAction: (HighlightAction, NovelHighlightManager.HighlightEntry, Double) -> Unit,
         private val onNoteChanged: (NovelHighlightManager.HighlightEntry, Double, String?) -> Unit,
     ) : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
@@ -243,12 +252,12 @@ class NovelHighlightsActivity : AppCompatActivity() {
                 TYPE_HEADER -> {
                     val view = LayoutInflater.from(parent.context)
                         .inflate(R.layout.item_highlight_chapter_header, parent, false)
-                    HeaderViewHolder(view)
+                    HeaderViewHolder(view, accentColor)
                 }
                 else -> {
                     val view = LayoutInflater.from(parent.context)
                         .inflate(R.layout.item_highlight_card, parent, false)
-                    HighlightViewHolder(view, onAction, onNoteChanged, dateFormat)
+                    HighlightViewHolder(view, accentColor, onAction, onNoteChanged, dateFormat)
                 }
             }
         }
@@ -260,15 +269,18 @@ class NovelHighlightsActivity : AppCompatActivity() {
             }
         }
 
-        class HeaderViewHolder(view: View) : RecyclerView.ViewHolder(view) {
+        class HeaderViewHolder(view: View, private val accentColor: Int) : RecyclerView.ViewHolder(view) {
             private val titleView: TextView = view.findViewById(R.id.chapter_header_title)
+            private val accentBar: View? = view.findViewById(R.id.chapter_header_accent_bar)
             fun bind(title: String) {
                 titleView.text = title
+                accentBar?.setBackgroundColor(accentColor)
             }
         }
 
         class HighlightViewHolder(
             view: View,
+            private val accentColor: Int,
             private val onAction: (HighlightAction, NovelHighlightManager.HighlightEntry, Double) -> Unit,
             private val onNoteChanged: (NovelHighlightManager.HighlightEntry, Double, String?) -> Unit,
             private val dateFormat: SimpleDateFormat
@@ -288,7 +300,7 @@ class NovelHighlightsActivity : AppCompatActivity() {
                 val color = try {
                     android.graphics.Color.parseColor(entry.color ?: NovelHighlightManager.COLOR_YELLOW)
                 } catch (e: Exception) {
-                    ContextCompat.getColor(itemView.context, R.color.colorAccent)
+                    accentColor
                 }
                 val drawable = GradientDrawable().apply {
                     shape = GradientDrawable.RECTANGLE
@@ -296,8 +308,6 @@ class NovelHighlightsActivity : AppCompatActivity() {
                     cornerRadius = 8f
                 }
                 colorBar.background = drawable
-
-                val accentColor = ContextCompat.getColor(itemView.context, R.color.colorAccent)
 
                 // Note display
                 if (!entry.note.isNullOrBlank()) {
@@ -310,7 +320,7 @@ class NovelHighlightsActivity : AppCompatActivity() {
                 }
                 noteInput.isVisible = false
 
-                // Style hint and underline in accent color
+                // Style hint and underline in accent color (vibrant cover color)
                 addNoteHint.setTextColor(accentColor)
                 noteInput.backgroundTintList = android.content.res.ColorStateList.valueOf(accentColor)
 
