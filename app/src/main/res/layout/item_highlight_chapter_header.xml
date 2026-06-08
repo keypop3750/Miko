@@ -13,7 +13,7 @@
         android:layout_width="4dp"
         android:layout_height="24dp"
         android:layout_marginEnd="10dp"
-        android:background="@android:color/white" />
+        android:background="?attr/colorOnSurface" />
 
     <TextView
         android:id="@+id/chapter_header_title"
@@ -21,7 +21,7 @@
         android:layout_height="wrap_content"
         android:layout_weight="1"
         android:textAppearance="?textAppearanceTitleMedium"
-        android:textColor="@android:color/white"
+        android:textColor="?attr/colorOnSurface"
         android:textStyle="bold" />
 
 </LinearLayout>

@@ -16,6 +16,7 @@ import android.widget.ImageView
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import androidx.core.graphics.ColorUtils
 import androidx.core.view.isVisible
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -110,10 +111,17 @@ class NovelHighlightsActivity : AppCompatActivity() {
         val backdropGradient: View = binding.backdropGradient
         val trueBackdrop: View = binding.trueBackdrop
 
+        // Detect light background for contrast adjustments
+        val readerBg = if (intent.hasExtra(EXTRA_READER_BG)) intent.getIntExtra(EXTRA_READER_BG, 0) else null
+        val isLightBg = readerBg != null &&
+            (readerBg == Color.WHITE || ColorUtils.calculateLuminance(readerBg) > 0.7)
+
         posterUrl?.let { url ->
             backdrop.isVisible = true
             backdropGradient.isVisible = true
             trueBackdrop.isVisible = true
+            // Increase image alpha on light backgrounds so it remains visible
+            backdrop.alpha = if (isLightBg) 0.35f else 0.15f
             val request = ImageRequest.Builder(this)
                 .data(url)
                 .target(backdrop)
@@ -137,6 +145,14 @@ class NovelHighlightsActivity : AppCompatActivity() {
         vibrantColor?.let { color ->
             trueBackdrop.setBackgroundColor(color)
             trueBackdrop.isVisible = true
+        }
+
+        // On light backgrounds, darken the gradient overlay so the transition is visible
+        if (isLightBg) {
+            backdropGradient.background = GradientDrawable(
+                GradientDrawable.Orientation.TOP_BOTTOM,
+                intArrayOf(Color.parseColor("#40FFFFFF"), readerBg ?: Color.WHITE)
+            )
         }
     }
 

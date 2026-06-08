@@ -13,6 +13,7 @@ import android.widget.ImageButton
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
+import androidx.core.graphics.ColorUtils
 import androidx.core.view.isVisible
 import androidx.lifecycle.lifecycleScope
 import com.google.android.material.progressindicator.CircularProgressIndicator
@@ -321,7 +322,7 @@ class NovelReaderActivity : BaseActivity<NovelReaderActivityBinding>() {
             theme,
             getResourceColor(R.attr.background)
         )
-        
+
         // Convert reader background color to appropriate text color
         val textColor = when (ReaderBackgroundColor.fromPreference(theme)) {
             ReaderBackgroundColor.GRAY -> android.graphics.Color.WHITE
@@ -329,15 +330,35 @@ class NovelReaderActivity : BaseActivity<NovelReaderActivityBinding>() {
             ReaderBackgroundColor.WHITE -> android.graphics.Color.BLACK
             else -> getResourceColor(R.attr.colorOnBackground)
         }
-        
+
+        // Detect light background for overlay theming
+        val isLightBg = backgroundColor == android.graphics.Color.WHITE ||
+            ColorUtils.calculateLuminance(backgroundColor) > 0.7
+        val overlayTextColor = if (isLightBg) android.graphics.Color.BLACK else getResourceColor(R.attr.actionBarTintColor)
+        val overlayBgColor = if (isLightBg) android.graphics.Color.parseColor("#F2FFFFFF") else getColor(R.color.surface_alpha)
+        val bottomSheetBg = if (isLightBg) android.graphics.Color.parseColor("#F2FFFFFF") else getResourceColor(R.attr.colorSurface)
+
         // Apply to ALL background layers (Phase 2: RecyclerView uses adapter theming)
         binding.rootCoordinator.setBackgroundColor(backgroundColor)
         binding.novelContentContainer.setBackgroundColor(backgroundColor)
         binding.novelRecyclerView.setBackgroundColor(backgroundColor)
-        
+
+        // Theme overlay to match background
+        binding.appBar.setBackgroundColor(overlayBgColor)
+        binding.toolbar.setTitleTextColor(overlayTextColor)
+        binding.toolbar.setSubtitleTextColor(if (isLightBg) android.graphics.Color.parseColor("#DE000000") else getResourceColor(R.attr.actionBarTintColor))
+        binding.toolbar.navigationIcon?.setTint(overlayTextColor)
+
+        // Theme bottom sheet and buttons
+        bottomSheet.setBackgroundColor(bottomSheetBg)
+        chaptersButton.setColorFilter(overlayTextColor)
+        findViewById<ImageButton>(R.id.webview_button)?.setColorFilter(overlayTextColor)
+        highlightsButton.setColorFilter(overlayTextColor)
+        settingsButton.setColorFilter(overlayTextColor)
+
         // Update loading indicator theme when theme changes (Phase 0)
         binding.loadingIndicator.setInvertMode(isInvertedFromTheme())
-        
+
         // BUG FIX: Update adapter's textConfig with new colors before notifying
         // This ensures rebind uses correct text/background colors
         val currentConfig = contentAdapter.textConfig
@@ -1084,6 +1105,18 @@ class NovelReaderActivity : BaseActivity<NovelReaderActivityBinding>() {
         
         // Update ViewModel with calculated position
         viewModel.updateCharacterPosition(characterPosition)
+
+        // Calculate and display reading progress percentage
+        val totalChars = items.filterIsInstance<TextItem.Paragraph>().lastOrNull()?.endCharIndex?.coerceAtLeast(1) ?: 1
+        val percent = ((characterPosition.toFloat() / totalChars) * 100).toInt().coerceIn(0, 100)
+        updateToolbarProgress(percent)
+    }
+
+    private fun updateToolbarProgress(percent: Int) {
+        lastProgressPercent = percent
+        val chapter = currentChapter
+        val chapterTitle = chapter?.let { NovelChapterAdapter.cleanChapterTitle(it.title) } ?: ""
+        supportActionBar?.subtitle = "$chapterTitle  ·  $percent%"
     }
     
     /**
@@ -1318,9 +1351,13 @@ class NovelReaderActivity : BaseActivity<NovelReaderActivityBinding>() {
     private fun updateToolbarInfo(novel: Novel?, chapter: NovelChapter?) {
         supportActionBar?.apply {
             title = novel?.title ?: "Novel Reader"
-            subtitle = if (chapter != null) NovelChapterAdapter.cleanChapterTitle(chapter.title) else "Chapter"
+            val chapterTitle = if (chapter != null) NovelChapterAdapter.cleanChapterTitle(chapter.title) else "Chapter"
+            val percent = lastProgressPercent
+            subtitle = if (percent >= 0) "$chapterTitle  ·  $percent%" else chapterTitle
         }
     }
+
+    private var lastProgressPercent = -1
 
     private fun updateChapterProgress() {
         // Slider removed - no progress slider for novels
