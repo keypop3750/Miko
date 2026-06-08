@@ -147,13 +147,21 @@ class NovelHighlightsActivity : AppCompatActivity() {
             trueBackdrop.isVisible = true
         }
 
-        // On light backgrounds, darken the gradient overlay so the transition is visible
-        if (isLightBg) {
-            backdropGradient.background = GradientDrawable(
-                GradientDrawable.Orientation.TOP_BOTTOM,
-                intArrayOf(Color.parseColor("#40FFFFFF"), readerBg ?: Color.WHITE)
+        // Build a smooth multi-stop gradient so the blurred image fades gradually
+        // into the background rather than ending in a stark cut-off.
+        val bgColor = readerBg
+            ?: (binding.coordinator.background as? android.graphics.drawable.ColorDrawable)?.color
+            ?: Color.WHITE
+        backdropGradient.background = GradientDrawable(
+            GradientDrawable.Orientation.TOP_BOTTOM,
+            intArrayOf(
+                Color.TRANSPARENT,                                    // top – image fully visible
+                ColorUtils.setAlphaComponent(bgColor, 40),   // ~15% bg
+                ColorUtils.setAlphaComponent(bgColor, 100),  // ~39% bg
+                ColorUtils.setAlphaComponent(bgColor, 180),  // ~71% bg
+                bgColor                                               // bottom – fully opaque bg
             )
-        }
+        )
     }
 
     private fun setupRecyclerView() {

@@ -11,14 +11,14 @@
     <View
         android:id="@+id/true_backdrop"
         android:layout_width="match_parent"
-        android:layout_height="320dp"
+        android:layout_height="420dp"
         android:visibility="gone" />
 
     <!-- Backdrop blurred cover image -->
     <ImageView
         android:id="@+id/backdrop"
         android:layout_width="match_parent"
-        android:layout_height="320dp"
+        android:layout_height="420dp"
         android:alpha="0.15"
         android:scaleType="centerCrop"
         android:visibility="gone"
@@ -28,7 +28,7 @@
     <View
         android:id="@+id/backdrop_gradient"
         android:layout_width="match_parent"
-        android:layout_height="320dp"
+        android:layout_height="420dp"
         android:background="@drawable/gradient_shape"
         android:backgroundTint="?attr/background"
         android:visibility="gone" />

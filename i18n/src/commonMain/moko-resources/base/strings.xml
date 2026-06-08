@@ -827,6 +827,13 @@
     <string name="backup_private_pref">Include sensitive settings (e.g. tracker login tokens)</string>
     <string name="novel_entries">Novel entries</string>
     <string name="last_auto_backup_info">Last automatically backed up: %s</string>
+    <string name="migrate_cover">Migrate cover</string>
+    <string name="migrate_info">Migrate info</string>
+    <string name="select_source">Select source</string>
+    <string name="searching_">Searching…</string>
+    <string name="no_results_found">No results found</string>
+    <string name="migrate_cover_applied">Cover migrated. Press Save to apply.</string>
+    <string name="migrate_info_applied">Info migrated. Press Save to apply.</string>
 
     <!-- Advanced section -->
     <string name="clear_chapter_cache">Clear chapter cache</string>
