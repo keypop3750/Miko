@@ -52,6 +52,7 @@ class NovelHighlightManager(context: Context) {
         paragraphIndex: Int = 0,
         color: String = COLOR_YELLOW,
         note: String? = null,
+        posterUrl: String? = null,
     ) {
         kotlinx.coroutines.GlobalScope.launch(Dispatchers.IO) {
             val data = loadData(novelKey)
@@ -77,7 +78,10 @@ class NovelHighlightManager(context: Context) {
             }
 
             val updatedChapters = data.chapters.filter { it.chapterNumber != chapterNumber } + chapterHighlights
-            val updatedData = data.copy(chapters = updatedChapters)
+            val updatedData = data.copy(
+                chapters = updatedChapters,
+                posterUrl = posterUrl ?: data.posterUrl,
+            )
             writeJson(novelKey, updatedData)
             exportToMd(novelKey, updatedData)
         }
@@ -148,6 +152,30 @@ class NovelHighlightManager(context: Context) {
      */
     fun hasHighlights(novelKey: NovelKey): Boolean {
         return loadData(novelKey).chapters.any { it.highlights.isNotEmpty() }
+    }
+
+    /**
+     * Get all novels that have at least one highlight.
+     * Returns a list of NovelHighlightsData sorted by most recent highlight.
+     */
+    fun getAllNovelsWithHighlights(): List<NovelHighlightsData> {
+        if (!highlightsDir.exists() || !highlightsDir.isDirectory) return emptyList()
+        val files = highlightsDir.listFiles { f -> f.isFile && f.name.endsWith(".json") } ?: return emptyList()
+        return files.mapNotNull { file ->
+            try {
+                val data = json.decodeFromString(NovelHighlightsData.serializer(), file.readText())
+                if (data.chapters.any { it.highlights.isNotEmpty() }) data else null
+            } catch (_: Exception) { null }
+        }.sortedByDescending { novel ->
+            novel.chapters.flatMap { it.highlights }.maxOfOrNull { it.timestamp } ?: 0L
+        }
+    }
+
+    /**
+     * Count total highlights across all novels.
+     */
+    fun getTotalHighlightCount(novelKey: NovelKey): Int {
+        return loadData(novelKey).chapters.sumOf { it.highlights.size }
     }
 
     /**
@@ -270,6 +298,7 @@ class NovelHighlightManager(context: Context) {
         val novelTitle: String,
         val author: String? = null,
         val description: String? = null,
+        val posterUrl: String? = null,
         val chapters: List<ChapterHighlights> = emptyList(),
     )
 

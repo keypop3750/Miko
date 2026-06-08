@@ -111,6 +111,10 @@
             android:name=".ui.novel.reader.NovelHighlightsActivity"
             android:theme="@style/Theme.Tachiyomi"
             android:exported="false"/>
+        <activity
+            android:name=".ui.novel.reader.AllHighlightsActivity"
+            android:theme="@style/Theme.Tachiyomi"
+            android:exported="false"/>
         <!-- Manga Details Activity (Activity-based implementation) -->
         <activity
             android:name=".ui.manga.MangaDetailsActivity"

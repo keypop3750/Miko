@@ -522,7 +522,7 @@ class NovelReaderActivity : BaseActivity<NovelReaderActivityBinding>() {
                 this@NovelReaderActivity.novel = novel
                 updateToolbarInfo(novel, currentChapter)
                 novel?.let {
-                    contentAdapter.setNovelInfo(it.title, it.author)
+                    contentAdapter.setNovelInfo(it.title, it.author, it.posterUrl)
                 }
             }
         }
@@ -1431,9 +1431,8 @@ class NovelReaderActivity : BaseActivity<NovelReaderActivityBinding>() {
     }
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
-        // Novel reader should not show menu items in toolbar - matches manga reader behavior
-        // Settings and share are available through bottom sheet overlay instead
-        return super.onCreateOptionsMenu(menu)
+        menuInflater.inflate(R.menu.novel_reader, menu)
+        return true
     }
 
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
@@ -1441,6 +1440,10 @@ class NovelReaderActivity : BaseActivity<NovelReaderActivityBinding>() {
             android.R.id.home -> {
                 // Exit reader and return to novel details page
                 finish()
+                true
+            }
+            R.id.action_highlights -> {
+                startActivity(AllHighlightsActivity.newIntent(this))
                 true
             }
             R.id.action_reader_settings -> {

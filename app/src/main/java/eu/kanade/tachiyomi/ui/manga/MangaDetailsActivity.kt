@@ -1528,12 +1528,23 @@ class MangaDetailsActivity :
     //region Menu handling
     override fun onCreateOptionsMenu(menu: android.view.Menu): Boolean {
         menuInflater.inflate(R.menu.manga_details, menu)
-        
+
         // Phase 2.1: Apply toolbar theming when menu is created
         colorToolbar(binding.recycler.canScrollVertically(-1))
-        
+
+        // Guard: manga may not be initialized yet if menu is created before DB load completes
+        if (!presenter.isMangaLateInitInitialized()) {
+            // Hide all action items until manga loads
+            listOf(
+                R.id.action_edit, R.id.action_download, R.id.action_mark_all_as_read,
+                R.id.action_mark_all_as_unread, R.id.action_remove_downloads,
+                R.id.remove_non_bookmarked, R.id.action_migrate, R.id.action_search,
+            ).forEach { menu.findItem(it)?.isVisible = false }
+            return true
+        }
+
         updateMenuVisibility(menu)
-        
+
         // Update migrate menu title with series type
         menu.findItem(R.id.action_migrate)?.title = getString(
             yokai.i18n.MR.strings.migrate_,
