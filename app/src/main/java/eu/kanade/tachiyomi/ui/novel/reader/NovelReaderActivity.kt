@@ -560,9 +560,10 @@ class NovelReaderActivity : BaseActivity<NovelReaderActivityBinding>() {
                         // Callback runs after adapter update is complete
                         binding.novelRecyclerView.post {
                             if (shouldScroll && currentProgress.shouldScrollTo && characterPosition >= 0) {
-                                android.util.Log.d("NovelReaderActivity", "Restoring scroll position to character $characterPosition")
-                                scrollToCharacterPosition(characterPosition)
-                                
+                                val chapterId = viewModel.currentChapter.value?.id ?: -1L
+                                android.util.Log.d("NovelReaderActivity", "Restoring scroll position to character $characterPosition in chapter $chapterId")
+                                scrollToCharacterPosition(characterPosition, targetChapterId = chapterId)
+
                                 // Reset flags after scroll restoration to prevent re-scrolling
                                 viewModel.clearScrollRestorationFlag()
                             }
@@ -939,7 +940,8 @@ class NovelReaderActivity : BaseActivity<NovelReaderActivityBinding>() {
         val absoluteEndChar: Int,    // Absolute character position in chapter
         val absoluteTop: Int,        // Absolute Y coordinate in window space
         val absoluteBottom: Int,     // Absolute Y coordinate in window space
-        val paragraphIndex: Int      // Which paragraph this line belongs to (for debugging)
+        val paragraphIndex: Int,     // Which paragraph this line belongs to (for debugging)
+        val chapterId: Long          // Which chapter this line belongs to (critical for infinite scroll)
     )
 
     /**
@@ -990,7 +992,8 @@ class NovelReaderActivity : BaseActivity<NovelReaderActivityBinding>() {
                     absoluteEndChar = absoluteEndChar,
                     absoluteTop = lineTop,
                     absoluteBottom = lineBottom,
-                    paragraphIndex = position
+                    paragraphIndex = position,
+                    chapterId = paragraph.chapterId
                 ))
             }
         }
@@ -1043,17 +1046,22 @@ class NovelReaderActivity : BaseActivity<NovelReaderActivityBinding>() {
     private fun calculateCurrentCharacterPosition(): Int {
         val visibleLines = getAllVisibleLines()
         if (visibleLines.isEmpty()) return 0
-        
+
         val contentTopY = getContentTopY()
-        
+
         // Find the first FULLY visible line (line.absoluteTop >= contentTopY)
         val firstFullyVisibleLine = visibleLines.firstOrNull { it.absoluteTop >= contentTopY }
             ?: visibleLines.firstOrNull() // Fallback to first line if none fully visible
             ?: return 0
-        
+
+        // Cache the chapter ID of the visible content for scroll restoration
+        lastVisibleChapterId = firstFullyVisibleLine.chapterId
+
         // Return the absolute character position where this line starts
         return firstFullyVisibleLine.absoluteStartChar
     }
+
+    private var lastVisibleChapterId: Long = -1L
 
     /**
      * Phase 4: Calculate character position from RecyclerView scroll state.
@@ -1190,7 +1198,7 @@ class NovelReaderActivity : BaseActivity<NovelReaderActivityBinding>() {
      * MIGRATION: Uses QuickNovel's verify-then-adjust pattern instead of assumption-based scroll.
      * Pattern: scrollToPositionWithOffset() → post{} → getAllVisibleLines() → find target → scrollBy(delta)
      */
-    private fun scrollToCharacterPosition(characterPosition: Int, sliderProgress: Float? = null) {
+    private fun scrollToCharacterPosition(characterPosition: Int, sliderProgress: Float? = null, targetChapterId: Long = lastVisibleChapterId) {
         // Special case for character 0 - scroll to absolute beginning
         if (characterPosition == 0) {
             android.util.Log.d("NovelReaderActivity", "Seeking to character 0 - scrolling to absolute top")
@@ -1259,9 +1267,14 @@ class NovelReaderActivity : BaseActivity<NovelReaderActivityBinding>() {
         // NEW ALGORITHM: Verify-then-adjust pattern from QuickNovel
         // No assumptions, no boundary detection - just verify actual positions after scroll
         
-        // Find paragraph containing target character
-        // FIX: Use <= for inclusive end (endCharIndex is the LAST char in paragraph)
-        val targetParagraph = paragraphs.find { paragraph ->
+        // Find paragraph containing target character, scoped to the correct chapter
+        // FIX: In infinite scroll, multiple chapters have overlapping char ranges.
+        //      Filter by chapterId first, then search within that chapter's paragraphs.
+        val chapterParagraphs = if (targetChapterId >= 0) {
+            paragraphs.filter { it.chapterId == targetChapterId }
+        } else paragraphs
+
+        val targetParagraph = chapterParagraphs.find { paragraph ->
             characterPosition >= paragraph.startCharIndex && characterPosition <= paragraph.endCharIndex
         }
         
@@ -1522,12 +1535,6 @@ class NovelReaderActivity : BaseActivity<NovelReaderActivityBinding>() {
     override fun onResume() {
         super.onResume()
         
-        android.util.Log.d("NovelReaderActivity", "onResume - Re-syncing text settings")
-        
-        // FIX: Re-sync adapter with preferences when returning to chapter
-        // This ensures spacing/settings persist after leaving and coming back
-        updateTextSettings()
-        
         // Update reading session
         viewModel.updateReadingSession()
     }
@@ -1552,8 +1559,9 @@ class NovelReaderActivity : BaseActivity<NovelReaderActivityBinding>() {
         
         // CRITICAL: Save position BEFORE any adapter changes while views are still valid
         val savedCharacterPosition = calculateCurrentCharacterPosition()
-        
-        android.util.Log.d("NovelReaderActivity", "Saved character position: $savedCharacterPosition")
+        val savedChapterId = lastVisibleChapterId
+
+        android.util.Log.d("NovelReaderActivity", "Saved character position: $savedCharacterPosition, chapterId: $savedChapterId")
         
         // MIGRATION: Read current settings and create TextConfig
         val theme = preferences.readerTheme().get()
@@ -1624,11 +1632,11 @@ class NovelReaderActivity : BaseActivity<NovelReaderActivityBinding>() {
                 binding.novelRecyclerView.viewTreeObserver.removeOnGlobalLayoutListener(this)
                 layoutListeners.remove(this)
                 
-                android.util.Log.d("NovelReaderActivity", "Layout complete - restoring to character $savedCharacterPosition")
-                
+                android.util.Log.d("NovelReaderActivity", "Layout complete - restoring to character $savedCharacterPosition in chapter $savedChapterId")
+
                 // Use existing character-based scroll method which handles all edge cases
-                scrollToCharacterPosition(savedCharacterPosition)
-                
+                scrollToCharacterPosition(savedCharacterPosition, targetChapterId = savedChapterId)
+
                 // Re-enable scroll restoration after completion
                 isRestoringScroll = false
             }
