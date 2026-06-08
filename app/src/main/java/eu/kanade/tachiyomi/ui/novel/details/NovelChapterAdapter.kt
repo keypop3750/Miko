@@ -21,7 +21,8 @@ class NovelChapterAdapter(
     private val onChapterLongClick: (NovelChapter) -> Unit,
     private val onDownloadClick: ((Int) -> Unit)? = null,  // Download button click callback
     private val onSwipeLeft: ((Int) -> Unit)? = null,  // Swipe left callback (mark read/unread)
-    private val onSwipeRight: ((Int) -> Unit)? = null  // Swipe right callback (bookmark)
+    private val onSwipeRight: ((Int) -> Unit)? = null,  // Swipe right callback (bookmark)
+    private val onSwipeStateChanged: ((Boolean) -> Unit)? = null  // true when swipe is active
 ) : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
 
     private var chapters = emptyList<NovelChapter>()
@@ -174,19 +175,15 @@ class NovelChapterAdapter(
                 if (chapter.chapterNumber >= 0) {
                     append("Ch. ${chapter.chapterNumber}")
                 }
-                if (chapter.wordCount > 0) {
-                    if (isNotEmpty()) append(" • ")
-                    append("${chapter.wordCount} words")
-                }
                 if (chapter.read) {
                     if (isNotEmpty()) append(" • ")
                     append("Read")
                 } else if (chapter.lastReadPosition > 0 && chapter.wordCount > 0) {
                     // Show percentage progress for partially-read chapters.
-                    // lastReadPosition is in characters; approximate total chars from wordCount.
+                    // wordCount stores total character count (set by reader on first open).
                     if (isNotEmpty()) append(" • ")
-                    val estimatedTotalChars = chapter.wordCount * 6 // ~5 chars + 1 space per word
-                    val pct = ((chapter.lastReadPosition.toDouble() / estimatedTotalChars) * 100)
+                    val totalChars = chapter.wordCount
+                    val pct = ((chapter.lastReadPosition.toDouble() / totalChars) * 100)
                         .toInt()
                         .coerceIn(1, 99)
                     append("${pct}%")
@@ -292,6 +289,12 @@ class NovelChapterAdapter(
                 
                 // Notify adapter to restore the item view after swipe
                 notifyItemChanged(position)
+            }
+            
+            override fun onSelectedChanged(viewHolder: RecyclerView.ViewHolder?, actionState: Int) {
+                super.onSelectedChanged(viewHolder, actionState)
+                // Disable SwipeRefreshLayout during swipe to prevent gesture conflict
+                onSwipeStateChanged?.invoke(actionState == ItemTouchHelper.ACTION_STATE_SWIPE)
             }
             
             override fun onChildDraw(

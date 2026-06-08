@@ -996,18 +996,22 @@ class NovelReaderViewModel(
                 novelRepository.updateReadingProgress(chapter.id, characterPosition)
                 android.util.Log.d("NovelReaderViewModel", "Saved reading position: chapterId=${chapter.id}, charPos=$characterPosition")
 
-                // Update reading time
+                // Calculate total characters from parsed text (NOT raw HTML length)
+                val totalChars = _contentItems.value.filterIsInstance<TextItem.Paragraph>().lastOrNull()?.endCharIndex
+                    ?: chapterCache.get(chapter.id)?.totalCharacters
+                    ?: 0
+
+                // Update reading time and persist total character count as wordCount
+                // so the chapter list can show accurate reading percentage
                 val readingTime = System.currentTimeMillis() - readingStartTime
                 val updatedChapter = chapter.copy(
                     lastReadPosition = characterPosition,
-                    readingTimeMs = chapter.readingTimeMs + readingTime
+                    readingTimeMs = chapter.readingTimeMs + readingTime,
+                    wordCount = if (totalChars > 0) totalChars else chapter.wordCount
                 )
                 novelRepository.updateChapter(updatedChapter)
 
                 // Only mark as read if user has scrolled past 95% of the chapter
-                val totalChars = chapterCache.get(chapter.id)?.totalCharacters
-                    ?: _contentItems.value.filterIsInstance<TextItem.Paragraph>().lastOrNull()?.endCharIndex
-                    ?: 0
                 if (totalChars > 0 && characterPosition >= totalChars * 0.95) {
                     novelRepository.markChapterRead(chapter.id, true)
                     android.util.Log.d("NovelReaderViewModel", "Auto-marked chapter ${chapter.id} as read (progress >= 95%)")

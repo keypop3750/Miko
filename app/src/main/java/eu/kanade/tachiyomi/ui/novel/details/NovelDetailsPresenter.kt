@@ -155,7 +155,13 @@ class NovelDetailsPresenter(
         return _novel.value?.filteredTranslators?.isNotEmpty() == true
     }
     
-    fun getNextUnreadChapter(): NovelChapter? = _chapters.value.firstOrNull { !it.read }
+    fun getNextUnreadChapter(): NovelChapter? {
+        return if (::novelChapterSort.isInitialized) {
+            novelChapterSort.getNextUnreadChapter(_chapters.value, andFiltered = false)
+        } else {
+            _chapters.value.firstOrNull { !it.read }
+        }
+    }
     fun getChaptersNow(): List<NovelChapter> = _chapters.value
     
     // DISABLED: Convert NovelChapter to ChapterItem for adapter compatibility (old controller removed)
@@ -551,14 +557,16 @@ class NovelDetailsPresenter(
                         }
                     }
                 } else if (_chapters.value.isEmpty()) {
-                    logger.i { "Novel has no chapters, launching background chapter fetch" }
+                    logger.i { "Novel has no chapters, launching background refresh from source" }
                     presenterScope.launchIO {
-                        logger.i { "Background chapter fetch coroutine started" }
+                        logger.i { "Background refresh coroutine started" }
                         try {
-                            fetchChaptersFromSource()
-                            logger.i { "Background chapter fetch coroutine completed successfully" }
+                            // Always refresh from source first to ensure novel is in DB
+                            // before fetching chapters (avoids FOREIGN KEY constraint errors)
+                            refreshNovelFromSource()
+                            logger.i { "Background refresh coroutine completed successfully" }
                         } catch (e: Exception) {
-                            logger.e(e) { "Background chapter fetch coroutine failed" }
+                            logger.e(e) { "Background refresh coroutine failed" }
                         }
                     }
                 }
@@ -812,19 +820,32 @@ class NovelDetailsPresenter(
             return
         }
         logger.d { "fetchChaptersFromSource: currentNovel found: ${currentNovel.title}" }
-        
+
+        // Guard against inserting chapters for a novel not yet in the database.
+        // This happens when a novel is opened from browse/search before being persisted.
+        val dbNovel = getNovel.awaitByUrlAndSource(currentNovel.url, currentNovel.source)
+        if (dbNovel == null) {
+            logger.w { "Novel not found in database, refreshing from source first" }
+            refreshNovelFromSource()
+            return
+        }
+        // Ensure we use the correct DB ID going forward
+        if (_novel.value?.id != dbNovel.id) {
+            _novel.value = dbNovel
+        }
+
         val novelSource = source
         if (novelSource == null) {
             logger.e { "fetchChaptersFromSource: source is null, returning" }
             return
         }
         logger.d { "fetchChaptersFromSource: source found: ${novelSource.javaClass.simpleName}" }
-        
+
         logger.d { "Fetching chapters from source" }
         try {
             _isLoading.value = true
             _error.value = null
-            
+
             val networkChapters = novelSource.getChapterList(currentNovel.url)
             logger.d { "Fetched ${networkChapters.size} chapters from source" }
             

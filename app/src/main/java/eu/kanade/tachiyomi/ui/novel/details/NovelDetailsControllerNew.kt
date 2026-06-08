@@ -184,7 +184,8 @@ class NovelDetailsControllerNew : BaseCoroutineController<NovelDetailsController
             onChapterLongClick = { chapter -> showChapterMenu(chapter) },
             onDownloadClick = { position -> downloadChapter(position) },
             onSwipeLeft = { position -> toggleReadChapter(position) },
-            onSwipeRight = { position -> bookmarkChapter(position) }
+            onSwipeRight = { position -> bookmarkChapter(position) },
+            onSwipeStateChanged = { isSwiping -> binding.swipeRefresh.isEnabled = !isSwiping }
         )
         
         binding.recycler.layoutManager = LinearLayoutManager(view?.context)
