@@ -106,7 +106,7 @@ sealed interface LibraryContentUiState {
             get() = categories.flatMap { it.items }
         
         val isEmpty: Boolean
-            get() = categories.isEmpty() || categories.all { it.items.isEmpty() }
+            get() = categories.isEmpty() || allItems.filterNot { it is LibraryContentItem.Placeholder }.isEmpty()
     }
     
     data class Error(val message: String) : LibraryContentUiState

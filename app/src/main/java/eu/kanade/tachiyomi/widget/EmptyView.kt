@@ -29,6 +29,7 @@ class EmptyView @JvmOverloads constructor(
 
     private var image by mutableStateOf(Icons.Filled.Download)
     private var message by mutableStateOf("")
+    private var highlight by mutableStateOf<String?>(null)
     private var actions by mutableStateOf(emptyList<Action>())
 
     init {
@@ -42,6 +43,7 @@ class EmptyView @JvmOverloads constructor(
             EmptyScreen(
                 image = image,
                 message = message,
+                highlight = highlight,
                 isTablet = isTablet(),
                 actions = actions,
             )
@@ -59,28 +61,41 @@ class EmptyView @JvmOverloads constructor(
      * Show the information view
      * @param textResource text of information view
      */
-    fun show(image: ImageVector, textResource: StringResource, actions: List<Action> = emptyList()) {
-        show(image, context.getString(textResource), actions)
+    fun show(image: ImageVector, textResource: StringResource, highlight: String? = null, actions: List<Action> = emptyList()) {
+        show(image, context.getString(textResource), highlight, actions)
+    }
+
+    fun show(image: ImageVector, textResource: StringResource, actions: List<Action>) {
+        show(image, context.getString(textResource), null, actions)
     }
 
     /**
      * Show the information view
      * @param textResource text of information view
      */
-    fun show(image: ImageVector, @StringRes textResource: Int, actions: List<Action> = emptyList()) {
-        show(image, context.getString(textResource), actions)
+    fun show(image: ImageVector, @StringRes textResource: Int, highlight: String? = null, actions: List<Action> = emptyList()) {
+        show(image, context.getString(textResource), highlight, actions)
+    }
+
+    fun show(image: ImageVector, @StringRes textResource: Int, actions: List<Action>) {
+        show(image, context.getString(textResource), null, actions)
     }
 
     /**
      * Show the information view
      * @param drawable icon of information view
-     * @param textResource text of information view
+     * @param message text of information view
      */
-    fun show(image: ImageVector, message: String, actions: List<Action> = emptyList()) {
+    fun show(image: ImageVector, message: String, highlight: String? = null, actions: List<Action> = emptyList()) {
         this.image = image
         this.message = message
+        this.highlight = highlight
         this.actions = actions
         this.isVisible = true
+    }
+
+    fun show(image: ImageVector, message: String, actions: List<Action>) {
+        show(image, message, null, actions)
     }
 
     data class Action(

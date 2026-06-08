@@ -22,7 +22,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -43,6 +48,7 @@ fun EmptyScreen(
     image: ImageVector,
     message: String,
     isTablet: Boolean,
+    highlight: String? = null,
     actions: List<EmptyView.Action> = emptyList(),
 ) = EmptyScreenImpl(
     modifier = modifier,
@@ -55,6 +61,7 @@ fun EmptyScreen(
         )
     },
     message = message,
+    highlight = highlight,
     actions = { EmptyScreenActions(actions, isTablet) },
     isTablet = isTablet,
 )
@@ -65,6 +72,7 @@ fun EmptyScreen(
     image: ImageBitmap,
     message: String,
     isTablet: Boolean,
+    highlight: String? = null,
     actions: List<EmptyView.Action> = emptyList(),
 ) = EmptyScreenImpl(
     modifier = modifier,
@@ -76,6 +84,7 @@ fun EmptyScreen(
         )
     },
     message = message,
+    highlight = highlight,
     actions = { EmptyScreenActions(actions, isTablet) },
     isTablet = isTablet,
 )
@@ -115,9 +124,31 @@ private fun EmptyScreenImpl(
     modifier: Modifier = Modifier,
     image: @Composable () -> Unit,
     message: String,
+    highlight: String? = null,
     actions: @Composable () -> Unit,
     isTablet: Boolean,
 ) {
+    val annotatedMessage = if (highlight != null) {
+        buildAnnotatedString {
+            val idx = message.indexOf(highlight)
+            if (idx >= 0) {
+                append(message.substring(0, idx))
+                withStyle(
+                    SpanStyle(
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.SemiBold,
+                    ),
+                ) {
+                    append(highlight)
+                }
+                append(message.substring(idx + highlight.length))
+            } else {
+                append(message)
+            }
+        }
+    } else {
+        AnnotatedString(message)
+    }
     if (isTablet) {
         Column(
             modifier = modifier
@@ -132,7 +163,7 @@ private fun EmptyScreenImpl(
                 Text(
                     modifier = Modifier
                         .padding(vertical = 4.dp),
-                    text = message,
+                    text = annotatedMessage,
                     color = MaterialTheme.colorScheme.textHint,
                     style = MaterialTheme.typography.labelMedium,
                 )
@@ -152,7 +183,7 @@ private fun EmptyScreenImpl(
             Text(
                 modifier = Modifier
                     .padding(vertical = 16.dp),
-                text = message,
+                text = annotatedMessage,
                 color = MaterialTheme.colorScheme.textHint,
                 style = MaterialTheme.typography.labelMedium,
                 textAlign = TextAlign.Center,

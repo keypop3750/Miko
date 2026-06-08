@@ -1861,6 +1861,14 @@ class MangaDetailsController :
         }
     }
 
+    override fun showEditDialog() {
+        editMangaDialog = EditMangaDialog(
+            this,
+            presenter.manga,
+        )
+        editMangaDialog?.showDialog(router)
+    }
+
     override fun zoomImageFromThumb(thumbView: View) {
         if (fullCoverActive) return
         val drawable = binding.mangaCoverFull.drawable ?: return

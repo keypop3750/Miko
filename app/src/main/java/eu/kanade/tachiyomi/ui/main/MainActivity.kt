@@ -1429,14 +1429,15 @@ open class MainActivity : BaseActivity<MainActivityBinding>() {
     }
 
     override fun onDestroy() {
-        super.onDestroy()
         overflowDialog?.dismiss()
         overflowDialog = null
+        (window.decorView as? ViewGroup)?.setOnHierarchyChangeListener(null)
         if (isBindingInitialized) {
             binding.appBar.mainActivity = null
             binding.toolbar.setNavigationOnClickListener(null)
             binding.searchToolbar.setNavigationOnClickListener(null)
         }
+        super.onDestroy()
     }
 
     private fun pressingBack() {

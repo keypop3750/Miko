@@ -239,6 +239,7 @@ class MangaDetailsAdapter private constructor(
         fun customActionMode(view: TextView): ActionMode.Callback
         fun copyContentToClipboard(content: String, label: String?, useToast: Boolean = false)
         fun zoomImageFromThumb(thumbView: View)
+        fun showEditDialog()
         fun showTrackingSheet()
         fun updateScroll()
         fun setFavButtonPopup(popupView: View)

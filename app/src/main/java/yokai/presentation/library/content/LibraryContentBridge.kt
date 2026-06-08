@@ -179,8 +179,13 @@ class LibraryContentBridge(
                 items = items,
             )
         }.filter { it.items.isNotEmpty() || categories.size > 1 }
-        
-        _uiState.value = if (categoryContents.isEmpty() && libraryItems.isEmpty()) {
+
+        // Check if there are any real (non-placeholder) items at all
+        val hasRealItems = libraryItems.any { it !is LibraryPlaceholderItem }
+        val isEffectivelyEmpty = categoryContents.isEmpty() && !hasRealItems
+        android.util.Log.d("LibraryContentBridge", "updateContent: categoryContents=${categoryContents.size}, hasRealItems=$hasRealItems, isEffectivelyEmpty=$isEffectivelyEmpty")
+
+        _uiState.value = if (isEffectivelyEmpty) {
             LibraryContentUiState.Success(emptyList())
         } else {
             LibraryContentUiState.Success(categoryContents)

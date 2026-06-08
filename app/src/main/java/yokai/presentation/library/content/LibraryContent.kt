@@ -58,11 +58,18 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import eu.kanade.tachiyomi.data.database.models.Category
 import eu.kanade.tachiyomi.util.compose.textHint
+import yokai.core.content.ContentType
+import yokai.core.mode.ModeManager
 
 /**
  * Layout mode for library content display
@@ -103,7 +110,6 @@ fun LibraryContent(
     modifier: Modifier = Modifier,
     contentPadding: PaddingValues = PaddingValues(0.dp),
     hasActiveFilters: Boolean = false,
-    onGettingStartedClick: (() -> Unit)? = null,
     // Single category mode
     currentCategoryIndex: Int = 0,
     currentCategoryId: Int? = null,
@@ -137,7 +143,6 @@ fun LibraryContent(
                     EmptyLibraryContent(
                         hasActiveFilters = hasActiveFilters,
                         modifier = innerModifier,
-                        onGettingStartedClick = onGettingStartedClick,
                     )
                 } else {
                     SuccessContent(
@@ -553,14 +558,13 @@ private fun LibraryGridContent(
 }
 
 /**
- * Empty library state that matches the original View-based EmptyView design.
- * Shows HeartBroken icon and "Getting started guide" action like the original.
+ * Empty library state matching the View-based EmptyView design.
+ * Shows HeartBroken icon and a single message with the mode name highlighted.
  */
 @Composable
 fun EmptyLibraryContent(
     hasActiveFilters: Boolean = false,
     modifier: Modifier = Modifier,
-    onGettingStartedClick: (() -> Unit)? = null,
 ) {
     Column(
         modifier = modifier
@@ -570,50 +574,45 @@ fun EmptyLibraryContent(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
-        // HeartBroken icon like original EmptyView
+        val libraryType = if (ModeManager.currentMode.value == ContentType.NOVEL) "Novel" else "Manga"
+
         Image(
             imageVector = if (hasActiveFilters) Icons.Outlined.FilterAlt else Icons.Filled.HeartBroken,
             contentDescription = null,
             modifier = Modifier.size(128.dp),
             colorFilter = ColorFilter.tint(MaterialTheme.colorScheme.textHint),
         )
-        
-        // Main message text
+
         Text(
             text = if (hasActiveFilters) {
-                "No matches for filters"
+                AnnotatedString("No matches for filters")
             } else {
-                "Your library is empty"
+                buildAnnotatedString {
+                    val fullMessage = "Your ${libraryType} library is empty, add series to your library from the browse tab."
+                    val idx = fullMessage.indexOf(libraryType)
+                    if (idx >= 0) {
+                        append(fullMessage.substring(0, idx))
+                        withStyle(
+                            SpanStyle(
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.SemiBold,
+                            ),
+                        ) {
+                            append(libraryType)
+                        }
+                        append(fullMessage.substring(idx + libraryType.length))
+                    } else {
+                        append(fullMessage)
+                    }
+                }
             },
-            modifier = Modifier.padding(vertical = 16.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 64.dp, vertical = 16.dp),
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.textHint,
             textAlign = TextAlign.Center,
         )
-        
-        // Secondary helpful message
-        Text(
-            text = if (hasActiveFilters) {
-                "Your library is empty, add series to your library from the browse tab."
-            } else {
-                "Add manga or novels from Browse to get started"
-            },
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-            textAlign = TextAlign.Center,
-        )
-        
-        // Getting Started Guide action button (only when no active filters)
-        if (!hasActiveFilters && onGettingStartedClick != null) {
-            Spacer(modifier = Modifier.height(8.dp))
-            TextButton(onClick = onGettingStartedClick) {
-                Text(
-                    text = "Getting started guide",
-                    fontSize = 14.sp,
-                    color = MaterialTheme.colorScheme.primary,
-                )
-            }
-        }
     }
 }
 

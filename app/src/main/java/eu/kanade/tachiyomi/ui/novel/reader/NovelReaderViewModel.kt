@@ -368,6 +368,8 @@ class NovelReaderViewModel(
 
     fun navigateToPreviousChapter() {
         if (currentChapterIndex > 0 && !_isLoadingPrevious.value) {
+            // Save position of the chapter we are leaving BEFORE switching
+            saveCurrentPosition()
             _isLoadingPrevious.value = true
             currentChapterIndex--
             val chapter = _chapters.value[currentChapterIndex]
@@ -399,6 +401,8 @@ class NovelReaderViewModel(
 
     fun navigateToNextChapter() {
         if (currentChapterIndex < _chapters.value.size - 1 && !_isLoadingNext.value) {
+            // Save position of the chapter we are leaving BEFORE switching
+            saveCurrentPosition()
             _isLoadingNext.value = true
             currentChapterIndex++
             val chapter = _chapters.value[currentChapterIndex]
@@ -579,6 +583,9 @@ class NovelReaderViewModel(
             // BUG FIX: Don't trigger scroll restoration for infinite scroll append
             _shouldScrollOnNextUpdate.value = false
             _contentItems.value = updatedItems
+            
+            // Save position of the chapter we are leaving BEFORE updating current chapter
+            saveCurrentPosition()
             
             // Update current chapter index
             currentChapterIndex = nextIndex

@@ -115,7 +115,7 @@ open class GlobalSearchController(
      * @param manga clicked item containing manga information.
      */
     override fun onMangaClick(manga: Manga) {
-        val source = sourceManager.getOrStub(manga.source) as? CatalogueSource
+        val source = presenter.sourceManager.getOrStub(manga.source) as? CatalogueSource
         lastPosition = adapter?.currentItems?.indexOfFirst { it.source.id == manga.source } ?: -1
 
         if (source?.isNovelSource() == true) {
@@ -125,19 +125,17 @@ open class GlobalSearchController(
                 source = manga.source,
                 url = manga.url,
                 title = manga.title,
-                artist = manga.artist,
                 author = manga.author,
                 description = manga.description,
                 genre = manga.genre,
-                status = manga.status.toLong(),
-                thumbnailUrl = manga.thumbnail_url,
-                favorite = manga.favorite,
-                lastUpdate = manga.last_update,
+                status = manga.status,
+                posterUrl = manga.thumbnail_url,
+                isFavorite = manga.favorite,
+                lastUpdate = manga.last_update ?: 0L,
                 initialized = manga.initialized,
-                viewerFlags = manga.viewer_flags.toLong(),
-                chapterFlags = manga.chapter_flags.toLong(),
+                dateAdded = manga.date_added ?: 0L,
                 coverLastModified = manga.cover_last_modified,
-                dateAdded = manga.date_added,
+                chapterFlags = manga.chapter_flags,
             )
             router.pushController(
                 NovelDetailsControllerNew(novel, true)
@@ -408,26 +406,24 @@ open class GlobalSearchController(
             val results = searchResult.firstOrNull()?.results
             if (results != null && searchResult.size == 1 && results.size == 1) {
                 val manga = results.first().manga
-                val source = sourceManager.getOrStub(manga.source) as? CatalogueSource
+                val source = presenter.sourceManager.getOrStub(manga.source) as? CatalogueSource
                 if (source?.isNovelSource() == true) {
                     val novel = yokai.domain.novel.Novel(
                         id = manga.id ?: -1,
                         source = manga.source,
                         url = manga.url,
                         title = manga.title,
-                        artist = manga.artist,
                         author = manga.author,
                         description = manga.description,
                         genre = manga.genre,
-                        status = manga.status.toLong(),
-                        thumbnailUrl = manga.thumbnail_url,
-                        favorite = manga.favorite,
-                        lastUpdate = manga.last_update,
+                        status = manga.status,
+                        posterUrl = manga.thumbnail_url,
+                        isFavorite = manga.favorite,
+                        lastUpdate = manga.last_update ?: 0L,
                         initialized = manga.initialized,
-                        viewerFlags = manga.viewer_flags.toLong(),
-                        chapterFlags = manga.chapter_flags.toLong(),
+                        dateAdded = manga.date_added ?: 0L,
                         coverLastModified = manga.cover_last_modified,
-                        dateAdded = manga.date_added,
+                        chapterFlags = manga.chapter_flags,
                     )
                     router.replaceTopController(
                         NovelDetailsControllerNew(novel, true)

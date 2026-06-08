@@ -73,7 +73,12 @@ class NovelChapterSort(
             else -> rawChapters
         }
 
-        return chapters.sortedWith(sortComparator(true)).find { !it.read }
+        // Primary sort respects user's sort type (forced ascending for "next" logic).
+        // chapterNumber is added as a tie-breaker so uploads with identical dates
+        // (or any other primary-key collision) still resolve in natural reading order.
+        return chapters
+            .sortedWith(sortComparator(true).thenBy { it.chapterNumber })
+            .find { !it.read }
     }
 
     /**
@@ -87,8 +92,8 @@ class NovelChapterSort(
         val sortFunction: (NovelChapter, NovelChapter) -> Int =
             when (novel.chapterOrder(preferences)) {
                 Novel.CHAPTER_SORTING_SOURCE -> when (sortDescending) {
-                    true -> { c1, c2 -> c1.sourceOrder.compareTo(c2.sourceOrder) }
-                    false -> { c1, c2 -> c2.sourceOrder.compareTo(c1.sourceOrder) }
+                    true -> { c1, c2 -> c2.sourceOrder.compareTo(c1.sourceOrder) }
+                    false -> { c1, c2 -> c1.sourceOrder.compareTo(c2.sourceOrder) }
                 }
                 Novel.CHAPTER_SORTING_NUMBER -> when (sortDescending) {
                     true -> { c1, c2 -> c2.chapterNumber.toString().compareToCaseInsensitiveNaturalOrder(c1.chapterNumber.toString()) }

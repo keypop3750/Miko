@@ -1406,6 +1406,10 @@ class MangaDetailsActivity :
         }
     }
     
+    override fun showEditDialog() {
+        showEditMangaDialog()
+    }
+
     /**
      * Zooms the cover image from thumbnail to full screen.
      */

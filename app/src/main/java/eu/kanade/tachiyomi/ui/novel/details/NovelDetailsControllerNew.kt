@@ -273,6 +273,11 @@ class NovelDetailsControllerNew : BaseCoroutineController<NovelDetailsController
             shareNovel()
         }
         
+        // Cover image click opens edit dialog
+        headerBinding?.novelCover?.setOnClickListener {
+            showEditDialog()
+        }
+        
         // Setup expand/collapse description
         headerBinding?.moreButton?.setOnClickListener {
             expandDescription()

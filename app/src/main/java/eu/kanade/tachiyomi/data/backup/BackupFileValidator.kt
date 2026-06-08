@@ -31,7 +31,7 @@ class BackupFileValidator(
             backup.backupNovelSources.associate { it.sourceId to it.name }
         val missingSources = sources
             .filter { sourceManager.get(it.key) == null }
-            .map { sourceManager.getOrStub(it.key).name }
+            .map { it.value }
             .sorted()
 
         val trackers = backup.backupManga

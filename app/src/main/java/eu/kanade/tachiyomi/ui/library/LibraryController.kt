@@ -932,9 +932,6 @@ open class LibraryController(
                             libraryContentBridge.toggleCategoryExpansion(category.id ?: 0)
                         },
                         hasActiveFilters = hasActiveFilters,
-                        onGettingStartedClick = {
-                            activity?.openInBrowser("https://tachiyomi.org/docs/guides/getting-started#_2-adding-sources")
-                        },
                         contentPadding = androidx.compose.foundation.layout.PaddingValues(
                             top = topPaddingDp.dp,
                             bottom = 80.dp, // Bottom nav + FAB space
@@ -1729,17 +1726,21 @@ open class LibraryController(
     override fun onDestroyView(view: View) {
         destroyActionModeIfNeeded()
         if (isBindingInitialized) {
+            removeStaggeredObserver()
             binding.libraryGridRecycler.recycler.removeOnScrollListener(scrollListener)
+            binding.libraryGridRecycler.recycler.adapter = null
             binding.fastScroller.controller = null
         }
         displaySheet?.dismiss()
         displaySheet = null
-        mAdapter = null
         saveStaggeredState()
 
         showAllCategoriesView?.let {
             (activityBinding?.searchToolbar?.searchView as? MiniSearchView)?.removeSearchModifierIcon(it)
+            it.setOnClickListener(null)
         }
+        showAllCategoriesView = null
+        mAdapter = null
 
         // FIX: Clear unified search bar callbacks to prevent memory leak.
         // MainActivity holds unifiedSearchBarState for the app lifecycle;
@@ -1760,8 +1761,10 @@ open class LibraryController(
         // Update Compose content bridge if enabled
         if (useComposeLibraryContent) {
             libraryContentBridge.updateContent(mangaMap, presenter.categories)
-            // When using Compose, hide the old emptyView completely - Compose handles empty state
+            // When using Compose, hide all old View-based content - Compose handles everything
             binding.emptyView.hide()
+            binding.swipeRefresh.isVisible = false
+            binding.libraryGridRecycler.recycler.isVisible = false
         }
         
         if (mangaMap.isNotEmpty()) {
@@ -1771,22 +1774,17 @@ open class LibraryController(
             binding.emptyView.hide()
         } else if (!useComposeLibraryContent) {
             // Only show old View-based empty state when NOT using Compose
+            val libraryType = if (ModeManager.currentMode.value == ContentType.NOVEL) "Novel" else "Manga"
+            val emptyMessage = if (hasActiveFilters) {
+                view?.context?.getString(MR.strings.no_matches_for_filters) ?: "No matches found"
+            } else {
+                "Your ${libraryType} library is empty, add series to your library from the browse tab."
+            }
             binding.emptyView.show(
                 Icons.Filled.HeartBroken,
-                if (hasActiveFilters) {
-                    MR.strings.no_matches_for_filters
-                } else {
-                    MR.strings.library_is_empty_add_from_browse
-                },
-                if (!hasActiveFilters) {
-                    listOf(
-                        EmptyView.Action(MR.strings.getting_started_guide) {
-                            activity?.openInBrowser("https://tachiyomi.org/docs/guides/getting-started#_2-adding-sources")
-                        },
-                    )
-                } else {
-                    emptyList()
-                },
+                emptyMessage,
+                highlight = if (hasActiveFilters) null else libraryType,
+                actions = emptyList(),
             )
         }
         adapter.setItems(mangaMap)

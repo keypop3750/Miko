@@ -49,13 +49,12 @@ class LibraryListHolder(
             }
             when (item.type) {
                 is LibraryPlaceholderItem.Type.Blank -> {
-                    binding.title.text = itemView.context.getString(
-                        if (adapter.hasActiveFilters && item.type.mangaCount >= 1) {
-                            MR.strings.no_matches_for_filters_short
-                        } else {
-                            MR.strings.category_is_empty
-                        },
-                    )
+                    binding.title.text = if (adapter.hasActiveFilters && item.type.mangaCount >= 1) {
+                        itemView.context.getString(MR.strings.no_matches_for_filters_short)
+                    } else {
+                        val libraryType = if (yokai.core.mode.ModeManager.currentMode.value == yokai.core.content.ContentType.NOVEL) "Novel" else "Manga"
+                        "Your ${libraryType} library is empty, add series to your library from the browse tab."
+                    }
                 }
                 is LibraryPlaceholderItem.Type.Hidden -> {
                     binding.title.text = null

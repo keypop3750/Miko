@@ -418,34 +418,15 @@ class LibraryPresenter(
                 // Group novels by category
                 val groupedByCategory = novelLibraryItems.groupBy { it.first }
                 val novelMap: MutableMap<Category, List<LibraryItem>> = mutableMapOf()
-                
-                // Add categories with their novels
+
+                // Only add categories that have actual novels
+                // When completely empty, leave map empty so EmptyView with icon shows
                 allCategories.forEach { category ->
                     val catId = category.id ?: 0
                     val items = groupedByCategory[catId]?.map { it.second } ?: emptyList()
-                    if (items.isNotEmpty() || catId == 0) {
-                        // Always include default category, or categories with items
-                        novelMap[category] = items.ifEmpty {
-                            listOf(
-                                LibraryPlaceholderItem.blank(
-                                    catId,
-                                    LibraryHeaderItem({ categoryMap[it] ?: defaultCategory }, catId),
-                                    viewContext,
-                                )
-                            )
-                        }
+                    if (items.isNotEmpty()) {
+                        novelMap[category] = items
                     }
-                }
-                
-                // Ensure at least default category exists
-                if (novelMap.isEmpty()) {
-                    novelMap[defaultCategory] = listOf(
-                        LibraryPlaceholderItem.blank(
-                            0,
-                            LibraryHeaderItem({ categoryMap[it] ?: defaultCategory }, 0),
-                            viewContext,
-                        )
-                    )
                 }
 
                 currentLibrary = novelMap
