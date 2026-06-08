@@ -147,19 +147,24 @@ class NovelHighlightsActivity : AppCompatActivity() {
             trueBackdrop.isVisible = true
         }
 
-        // Build a smooth multi-stop gradient so the blurred image fades gradually
-        // into the background rather than ending in a stark cut-off.
+        // Build a very gradual full-screen gradient so the background "seeps"
+        // softly into the blurred image with no hard line anywhere.
         val bgColor = readerBg
             ?: (binding.coordinator.background as? android.graphics.drawable.ColorDrawable)?.color
             ?: Color.WHITE
         backdropGradient.background = GradientDrawable(
             GradientDrawable.Orientation.TOP_BOTTOM,
             intArrayOf(
-                Color.TRANSPARENT,                                    // top – image fully visible
-                ColorUtils.setAlphaComponent(bgColor, 40),   // ~15% bg
-                ColorUtils.setAlphaComponent(bgColor, 100),  // ~39% bg
-                ColorUtils.setAlphaComponent(bgColor, 180),  // ~71% bg
-                bgColor                                               // bottom – fully opaque bg
+                Color.TRANSPARENT,      // 0.00 – image fully visible at top
+                Color.TRANSPARENT,      // 0.11 – keep image clear longer
+                Color.TRANSPARENT,      // 0.22
+                ColorUtils.setAlphaComponent(bgColor, 25),   // 0.33 – faint bg begins
+                ColorUtils.setAlphaComponent(bgColor, 60),   // 0.44
+                ColorUtils.setAlphaComponent(bgColor, 110),  // 0.55 – mid transition
+                ColorUtils.setAlphaComponent(bgColor, 160),  // 0.66
+                ColorUtils.setAlphaComponent(bgColor, 210),  // 0.77 – nearly opaque
+                bgColor,                // 0.88 – fully opaque
+                bgColor,                // 0.99 – solid for rest of screen
             )
         )
     }

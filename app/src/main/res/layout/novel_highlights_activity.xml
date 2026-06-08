@@ -24,13 +24,11 @@
         android:visibility="gone"
         android:contentDescription="@null" />
 
-    <!-- Backdrop gradient overlay -->
+    <!-- Backdrop gradient overlay - extends full height for seamless fade -->
     <View
         android:id="@+id/backdrop_gradient"
         android:layout_width="match_parent"
-        android:layout_height="420dp"
-        android:background="@drawable/gradient_shape"
-        android:backgroundTint="?attr/background"
+        android:layout_height="match_parent"
         android:visibility="gone" />
 
     <com.google.android.material.appbar.AppBarLayout

@@ -38,7 +38,11 @@ import eu.kanade.tachiyomi.util.system.materialAlertDialog
 import eu.kanade.tachiyomi.util.system.toast
 import eu.kanade.tachiyomi.util.view.setPositiveButton
 import eu.kanade.tachiyomi.widget.TachiyomiTextInputEditText
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
 import uy.kohesive.injekt.injectLazy
@@ -49,6 +53,9 @@ import yokai.util.coil.asTarget
 import yokai.util.coil.loadManga
 import yokai.util.lang.getString
 import android.R as AR
+import eu.kanade.tachiyomi.source.CatalogueSource
+import eu.kanade.tachiyomi.source.SourceManager
+import eu.kanade.tachiyomi.source.model.FilterList
 
 class EditMangaDialog : DialogController {
 
@@ -57,6 +64,7 @@ class EditMangaDialog : DialogController {
     private var customCoverUri: Uri? = null
 
     private var willResetCover = false
+    private var migratedPosterUrl: String? = null
 
     lateinit var binding: EditMangaDialogBinding
     private val languages = mutableListOf<String>()
@@ -232,6 +240,12 @@ class EditMangaDialog : DialogController {
             customCoverUri = null
             willResetCover = true
         }
+
+        // Migrate buttons: hidden for local manga
+        binding.migrateCover.isVisible = !isLocal
+        binding.migrateInfo.isVisible = !isLocal
+        binding.migrateCover.setOnClickListener { performMigrate(MigrateMode.COVER) }
+        binding.migrateInfo.setOnClickListener { performMigrate(MigrateMode.INFO) }
     }
 
     private fun addTags(textCanBeBlank: Boolean = false) {
@@ -382,6 +396,120 @@ class EditMangaDialog : DialogController {
         )
     }
 
+    // ------------------------------------------------------------------
+    // Migrate cover / info from another source
+    // ------------------------------------------------------------------
+
+    private enum class MigrateMode { COVER, INFO }
+
+    private fun performMigrate(mode: MigrateMode) {
+        val context = binding.root.context
+        val sourceManager = Injekt.get<SourceManager>()
+        val mangaSources = sourceManager.getCatalogueSources()
+            .filter { it !is eu.kanade.tachiyomi.source.novel.NovelSourceWrapper }
+            .filter { it.id != manga.source }
+            .sortedBy { it.name }
+            .toList()
+
+        if (mangaSources.isEmpty()) {
+            context.toast("No other manga sources installed")
+            return
+        }
+
+        androidx.appcompat.app.AlertDialog.Builder(context)
+            .setTitle(context.getString(MR.strings.select_source))
+            .setItems(mangaSources.map { it.name }.toTypedArray()) { _, which ->
+                searchSource(mangaSources[which], mode)
+            }
+            .setNegativeButton(AR.string.cancel, null)
+            .show()
+    }
+
+    private fun searchSource(source: CatalogueSource, mode: MigrateMode) {
+        val context = binding.root.context
+        val progressDialog = android.app.ProgressDialog(context).apply {
+            setMessage(context.getString(MR.strings.searching_))
+            setCancelable(false)
+            show()
+        }
+
+        GlobalScope.launch(Dispatchers.IO) {
+            try {
+                val page = source.getSearchManga(1, manga.title, FilterList())
+                withContext(Dispatchers.Main) {
+                    progressDialog.dismiss()
+                    if (page.mangas.isEmpty()) {
+                        context.toast(context.getString(MR.strings.no_results_found))
+                        return@withContext
+                    }
+                    showSearchResults(source, page.mangas, mode)
+                }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) {
+                    progressDialog.dismiss()
+                    context.toast("Search failed: ${e.message}")
+                }
+            }
+        }
+    }
+
+    private fun showSearchResults(source: CatalogueSource, results: List<SManga>, mode: MigrateMode) {
+        val context = binding.root.context
+        androidx.appcompat.app.AlertDialog.Builder(context)
+            .setTitle("Results from ${source.name}")
+            .setItems(results.map { it.title }.toTypedArray()) { _, which ->
+                fetchAndApply(source, results[which], mode)
+            }
+            .setNegativeButton(AR.string.cancel, null)
+            .show()
+    }
+
+    private fun fetchAndApply(source: CatalogueSource, selected: SManga, mode: MigrateMode) {
+        val context = binding.root.context
+        val progressDialog = android.app.ProgressDialog(context).apply {
+            setMessage("Fetching details…")
+            setCancelable(false)
+            show()
+        }
+
+        GlobalScope.launch(Dispatchers.IO) {
+            try {
+                val details = source.getMangaDetails(selected)
+                withContext(Dispatchers.Main) {
+                    progressDialog.dismiss()
+                    applyMigration(details, mode)
+                }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) {
+                    progressDialog.dismiss()
+                    context.toast("Failed to fetch details: ${e.message}")
+                }
+            }
+        }
+    }
+
+    private fun applyMigration(details: SManga, mode: MigrateMode) {
+        val context = binding.root.context
+        when (mode) {
+            MigrateMode.COVER -> {
+                migratedPosterUrl = details.thumbnail_url
+                binding.mangaCover.load(details.thumbnail_url)
+                willResetCover = false
+                customCoverUri = null
+                context.toast(context.getString(MR.strings.migrate_cover_applied))
+            }
+            MigrateMode.INFO -> {
+                binding.title.setText(details.title)
+                binding.mangaAuthor.setText(details.author)
+                binding.mangaArtist.setText(details.artist)
+                binding.mangaDescription.setText(details.description)
+                details.genre?.let { setGenreTags(it.split(",").map { g -> g.trim() }) }
+                binding.mangaStatus.setSelection(details.status.coerceIn(0, 5))
+                context.toast(context.getString(MR.strings.migrate_info_applied))
+            }
+        }
+    }
+
     companion object {
         private const val KEY_MANGA = "manga_id"
         
@@ -504,6 +632,10 @@ class EditMangaDialog : DialogController {
                 customCoverUri = null
                 willResetCover = true
             }
+            
+            // Migrate buttons hidden in Activity dialog (simplified context)
+            binding.migrateCover.isVisible = false
+            binding.migrateInfo.isVisible = false
             
             // Override positive button click to save changes
             dialog.setOnShowListener {
