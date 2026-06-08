@@ -120,8 +120,9 @@ class NovelHighlightsActivity : AppCompatActivity() {
             backdrop.isVisible = true
             backdropGradient.isVisible = true
             trueBackdrop.isVisible = true
-            // Increase image alpha on light backgrounds so it remains visible
-            backdrop.alpha = if (isLightBg) 0.35f else 0.15f
+            // Subtle image alpha: even on light backgrounds keep it restrained
+            // so the overall background never gets too bright
+            backdrop.alpha = if (isLightBg) 0.20f else 0.08f
             val request = ImageRequest.Builder(this)
                 .data(url)
                 .target(backdrop)
@@ -141,9 +142,14 @@ class NovelHighlightsActivity : AppCompatActivity() {
             trueBackdrop.isVisible = false
         }
 
-        // Apply vibrant cover color to backdrop (like novel detail page does)
+        // Apply vibrant cover color to backdrop, but darken it so bright covers
+        // (e.g. neon green) don't overwhelm the screen
         vibrantColor?.let { color ->
-            trueBackdrop.setBackgroundColor(color)
+            val hsl = FloatArray(3)
+            ColorUtils.colorToHSL(color, hsl)
+            hsl[2] = (hsl[2] * 0.6f).coerceIn(0f, 0.6f) // darken 40%, cap at 60% lightness
+            val darkenedColor = ColorUtils.HSLToColor(hsl)
+            trueBackdrop.setBackgroundColor(darkenedColor)
             trueBackdrop.isVisible = true
         }
 
