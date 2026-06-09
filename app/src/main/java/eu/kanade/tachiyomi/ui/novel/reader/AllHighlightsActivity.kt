@@ -9,7 +9,6 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.TextView
-import androidx.appcompat.app.AppCompatActivity
 import androidx.core.graphics.ColorUtils
 import androidx.core.view.isVisible
 import androidx.lifecycle.lifecycleScope
@@ -19,8 +18,8 @@ import coil3.imageLoader
 import coil3.request.ImageRequest
 import coil3.request.target
 import eu.kanade.tachiyomi.R
-import eu.kanade.tachiyomi.data.preference.PreferencesHelper
 import eu.kanade.tachiyomi.databinding.ActivityAllHighlightsBinding
+import eu.kanade.tachiyomi.ui.base.activity.BaseThemedActivity
 import eu.kanade.tachiyomi.util.system.ThemeUtil
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -37,11 +36,10 @@ import yokai.domain.novel.NovelStatus
  * Uses the novel reader theme so the background matches the user's novel reading preferences.
  * Card metadata (author, status, cover) is fetched from the novel database for accuracy.
  */
-class AllHighlightsActivity : AppCompatActivity() {
+class AllHighlightsActivity : BaseThemedActivity() {
 
     private lateinit var binding: ActivityAllHighlightsBinding
     private lateinit var adapter: NovelHighlightsAdapter
-    private val preferences: PreferencesHelper by injectLazy()
     private val novelRepository: NovelRepository by injectLazy()
 
     companion object {
@@ -58,7 +56,6 @@ class AllHighlightsActivity : AppCompatActivity() {
             preferences.readerTheme().get(),
             getResourceColor(R.attr.background)
         )
-        setTheme(android.R.style.Theme_Material_NoActionBar)
 
         binding = ActivityAllHighlightsBinding.inflate(layoutInflater)
         setContentView(binding.root)

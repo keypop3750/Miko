@@ -14,7 +14,6 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.TextView
-import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.core.graphics.ColorUtils
 import androidx.core.view.isVisible
@@ -22,8 +21,8 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.appbar.MaterialToolbar
 import eu.kanade.tachiyomi.R
-import eu.kanade.tachiyomi.data.preference.PreferencesHelper
 import eu.kanade.tachiyomi.databinding.NovelHighlightsActivityBinding
+import eu.kanade.tachiyomi.ui.base.activity.BaseThemedActivity
 import eu.kanade.tachiyomi.util.system.ThemeUtil
 import coil3.imageLoader
 import coil3.request.ImageRequest
@@ -43,7 +42,7 @@ import yokai.domain.novel.NovelRepository
  * - Highlight text with colored left bar
  * - Date/time as sub-text
  */
-class NovelHighlightsActivity : AppCompatActivity() {
+class NovelHighlightsActivity : BaseThemedActivity() {
 
     private lateinit var binding: NovelHighlightsActivityBinding
     private lateinit var highlightManager: NovelHighlightManager
@@ -54,7 +53,6 @@ class NovelHighlightsActivity : AppCompatActivity() {
     private var posterUrl: String? = null
     private var vibrantColor: Int? = null
 
-    private val preferences: PreferencesHelper by injectLazy()
     private val novelRepository: NovelRepository by injectLazy()
 
     companion object {
