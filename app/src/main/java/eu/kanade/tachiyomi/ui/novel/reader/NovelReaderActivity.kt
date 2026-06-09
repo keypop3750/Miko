@@ -540,7 +540,7 @@ class NovelReaderActivity : BaseActivity<NovelReaderActivityBinding>() {
                 this@NovelReaderActivity.novel = novel
                 updateToolbarInfo(novel, currentChapter)
                 novel?.let {
-                    contentAdapter.setNovelInfo(it.title, it.author, it.posterUrl, it.vibrantCoverColor)
+                    contentAdapter.setNovelInfo(it.title, it.author, it.posterUrl, it.vibrantCoverColor, it.id)
                 }
             }
         }

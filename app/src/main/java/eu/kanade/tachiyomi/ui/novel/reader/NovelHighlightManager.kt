@@ -80,6 +80,10 @@ class NovelHighlightManager(context: Context) {
 
             val updatedChapters = data.chapters.filter { it.chapterNumber != chapterNumber } + chapterHighlights
             val updatedData = data.copy(
+                novelTitle = novelKey.title,
+                author = novelKey.author ?: data.author,
+                description = novelKey.description ?: data.description,
+                novelId = novelKey.novelId ?: data.novelId,
                 chapters = updatedChapters,
                 posterUrl = posterUrl ?: data.posterUrl,
                 vibrantCoverColor = vibrantCoverColor ?: data.vibrantCoverColor,

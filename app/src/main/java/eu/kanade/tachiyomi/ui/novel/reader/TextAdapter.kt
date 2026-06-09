@@ -31,14 +31,16 @@ class TextAdapter(
     private var novelAuthor: String? = null
     private var novelPosterUrl: String? = null
     private var novelVibrantColor: Int? = null
+    private var novelId: Long? = null
     private var chapterTitle: String = ""
     private var chapterNumber: Double = 0.0
 
-    fun setNovelInfo(title: String, author: String?, posterUrl: String? = null, vibrantColor: Int? = null) {
+    fun setNovelInfo(title: String, author: String?, posterUrl: String? = null, vibrantColor: Int? = null, id: Long? = null) {
         novelTitle = title
         novelAuthor = author
         novelPosterUrl = posterUrl
         novelVibrantColor = vibrantColor
+        novelId = id
     }
 
     fun setChapterInfo(title: String, number: Double) {
@@ -59,6 +61,7 @@ class TextAdapter(
                     view = view,
                     getConfig = { textConfig },
                     getNovelInfo = { Triple(novelTitle, novelAuthor, novelPosterUrl ?: "") },
+                    getNovelId = { novelId },
                     getNovelColor = { novelVibrantColor },
                     getChapterInfo = { chapterTitle to chapterNumber },
                     getHighlightManager = { highlightManager },
@@ -145,6 +148,7 @@ class TextAdapter(
         view: View,
         private val getConfig: () -> TextConfig,
         private val getNovelInfo: () -> Triple<String, String?, String>,
+        private val getNovelId: () -> Long?,
         private val getNovelColor: () -> Int?,
         private val getChapterInfo: () -> Pair<String, Double>,
         private val getHighlightManager: () -> NovelHighlightManager?,
@@ -229,6 +233,7 @@ class TextAdapter(
                                         novelKey = NovelHighlightManager.NovelKey(
                                             title = novelTitle,
                                             author = novelAuthor,
+                                            novelId = getNovelId(),
                                         ),
                                         chapterNumber = chapterNumber,
                                         chapterTitle = chapterTitle,
@@ -270,7 +275,7 @@ class TextAdapter(
             if (novelTitle.isBlank()) return spannable
 
             val highlights = manager.getChapterHighlights(
-                NovelHighlightManager.NovelKey(title = novelTitle),
+                NovelHighlightManager.NovelKey(title = novelTitle, novelId = getNovelId()),
                 chapterNumber
             )
             if (highlights.isEmpty()) return spannable
@@ -363,7 +368,7 @@ class TextAdapter(
 
             // Find the stored highlight entry
             val highlights = manager.getChapterHighlights(
-                NovelHighlightManager.NovelKey(title = novelTitle, author = novelAuthor),
+                NovelHighlightManager.NovelKey(title = novelTitle, author = novelAuthor, novelId = getNovelId()),
                 chapterNumber
             )
             val match = highlights.find { highlightText.contains(it.text) || it.text.contains(highlightText) }
@@ -383,7 +388,7 @@ class TextAdapter(
                 "Delete" to {
                     if (match != null) {
                         manager.deleteHighlight(
-                            NovelHighlightManager.NovelKey(title = novelTitle, author = novelAuthor),
+                            NovelHighlightManager.NovelKey(title = novelTitle, author = novelAuthor, novelId = getNovelId()),
                             chapterNumber,
                             match.text,
                             match.timestamp
@@ -485,7 +490,7 @@ class TextAdapter(
                     val note = editText.text.toString().takeIf { it.isNotBlank() }
                     if (match != null) {
                         manager.updateHighlightNote(
-                            NovelHighlightManager.NovelKey(title = novelTitle, author = novelAuthor),
+                            NovelHighlightManager.NovelKey(title = novelTitle, author = novelAuthor, novelId = getNovelId()),
                             chapterNumber,
                             match.text,
                             match.timestamp,
@@ -493,7 +498,7 @@ class TextAdapter(
                         )
                     } else {
                         manager.saveHighlight(
-                            NovelHighlightManager.NovelKey(title = novelTitle, author = novelAuthor),
+                            NovelHighlightManager.NovelKey(title = novelTitle, author = novelAuthor, novelId = getNovelId()),
                             chapterNumber,
                             chapterTitle,
                             highlightText,

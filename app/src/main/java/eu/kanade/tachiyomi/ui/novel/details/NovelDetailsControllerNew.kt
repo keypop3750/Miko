@@ -478,15 +478,19 @@ class NovelDetailsControllerNew : BaseCoroutineController<NovelDetailsController
             lessButton.isVisible = false
             
             // Update start reading button
-            val nextChapter = presenter.getNextUnreadChapter()
-            if (nextChapter != null) {
-                startReadingButton.text = "Continue: ${nextChapter.title}"
-            } else {
-                startReadingButton.text = activity?.getString(MR.strings.start_reading)
-            }
+            updateStartReadingButton()
         }
-        
+
         logger.d { "Header updated for: ${novel.title}" }
+    }
+
+    private fun updateStartReadingButton() {
+        val nextChapter = presenter.getNextUnreadChapter()
+        headerBinding?.startReadingButton?.text = if (nextChapter != null) {
+            "Continue: ${nextChapter.title}"
+        } else {
+            activity?.getString(MR.strings.start_reading) ?: "Start reading"
+        }
     }
 
     private fun updateChapterList(chapters: List<NovelChapter>) {
@@ -495,9 +499,10 @@ class NovelDetailsControllerNew : BaseCoroutineController<NovelDetailsController
         } else {
             chapters.filter { it.title.contains(searchQuery, ignoreCase = true) }
         }
-        
+
         adapter?.updateChapters(filteredChapters)
         updateChapterHeader()
+        updateStartReadingButton()
         logger.d { "Chapter list updated: ${filteredChapters.size} chapters" }
     }
     
