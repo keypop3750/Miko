@@ -357,12 +357,22 @@ class NovelReaderViewModel(
     fun updateCurrentChapterById(chapterId: Long) {
         val chapter = _chapters.value.find { it.id == chapterId }
         if (chapter != null && _currentChapter.value?.id != chapterId) {
+            val previousChapter = _currentChapter.value
             android.util.Log.d("NovelReaderViewModel", "Updating current chapter to: ${chapter.title} (ID: $chapterId)")
             _currentChapter.value = chapter
             currentChapterIndex = _chapters.value.indexOf(chapter)
-            
-            // Chapter read status is only updated via saveCurrentPosition when
-            // meaningful progress is made (not just from scrolling into view).
+
+            // Mark the previous chapter as read since the user has scrolled past it
+            previousChapter?.let { prev ->
+                viewModelScope.launch {
+                    try {
+                        novelRepository.markChapterRead(prev.id, true)
+                        android.util.Log.d("NovelReaderViewModel", "Auto-marked previous chapter ${prev.id} as read (scrolled past)")
+                    } catch (e: Exception) {
+                        android.util.Log.e("NovelReaderViewModel", "Failed to mark previous chapter as read", e)
+                    }
+                }
+            }
         }
     }
 
@@ -841,6 +851,14 @@ class NovelReaderViewModel(
             novelDownloadManager.deleteChapter(novel, chapter)
             _events.emit(NovelReaderEvent.ShowMessage("Download deleted"))
         }
+    }
+
+    /**
+     * Get the compiled EPUB file for the current novel if it exists.
+     */
+    fun getCompiledEpub(): java.io.File? {
+        val novel = _novel.value ?: return null
+        return novelDownloadManager.getCompiledEpub(novel)
     }
 
     fun toggleBookmark() {

@@ -53,6 +53,7 @@ class NovelHighlightManager(context: Context) {
         color: String = COLOR_YELLOW,
         note: String? = null,
         posterUrl: String? = null,
+        vibrantCoverColor: Int? = null,
     ) {
         kotlinx.coroutines.GlobalScope.launch(Dispatchers.IO) {
             val data = loadData(novelKey)
@@ -81,6 +82,7 @@ class NovelHighlightManager(context: Context) {
             val updatedData = data.copy(
                 chapters = updatedChapters,
                 posterUrl = posterUrl ?: data.posterUrl,
+                vibrantCoverColor = vibrantCoverColor ?: data.vibrantCoverColor,
             )
             writeJson(novelKey, updatedData)
             exportToMd(novelKey, updatedData)
@@ -299,6 +301,7 @@ class NovelHighlightManager(context: Context) {
         val author: String? = null,
         val description: String? = null,
         val posterUrl: String? = null,
+        val vibrantCoverColor: Int? = null,
         val chapters: List<ChapterHighlights> = emptyList(),
     )
 

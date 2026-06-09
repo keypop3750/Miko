@@ -20,4 +20,10 @@
         android:title="Share"
         app:showAsAction="ifRoom" />
 
+    <item
+        android:id="@+id/action_open_epub"
+        android:icon="@drawable/ic_file_download_24dp"
+        android:title="Open EPUB"
+        app:showAsAction="never" />
+
 </menu>

@@ -24,6 +24,7 @@ import eu.kanade.tachiyomi.ui.reader.settings.ReaderBackgroundColor
 import eu.kanade.tachiyomi.ui.reader.viewer.GestureDetectorWithLongTap
 import eu.kanade.tachiyomi.ui.base.activity.BaseActivity
 import eu.kanade.tachiyomi.ui.webview.WebViewActivity
+import eu.kanade.tachiyomi.util.storage.getUriCompat
 import eu.kanade.tachiyomi.util.system.getResourceColor
 import eu.kanade.tachiyomi.util.system.isInNightMode
 import eu.kanade.tachiyomi.util.system.toast
@@ -522,7 +523,7 @@ class NovelReaderActivity : BaseActivity<NovelReaderActivityBinding>() {
                 this@NovelReaderActivity.novel = novel
                 updateToolbarInfo(novel, currentChapter)
                 novel?.let {
-                    contentAdapter.setNovelInfo(it.title, it.author, it.posterUrl)
+                    contentAdapter.setNovelInfo(it.title, it.author, it.posterUrl, it.vibrantCoverColor)
                 }
             }
         }
@@ -1432,6 +1433,9 @@ class NovelReaderActivity : BaseActivity<NovelReaderActivityBinding>() {
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
         menuInflater.inflate(R.menu.novel_reader, menu)
+        // Show Open EPUB only if a compiled EPUB exists for this novel
+        val hasEpub = viewModel.getCompiledEpub() != null
+        menu.findItem(R.id.action_open_epub)?.isVisible = hasEpub
         return true
     }
 
@@ -1455,7 +1459,30 @@ class NovelReaderActivity : BaseActivity<NovelReaderActivityBinding>() {
                 shareChapter()
                 true
             }
+            R.id.action_open_epub -> {
+                openCompiledEpub()
+                true
+            }
             else -> super.onOptionsItemSelected(item)
+        }
+    }
+
+    private fun openCompiledEpub() {
+        val epubFile = viewModel.getCompiledEpub()
+        if (epubFile == null || !epubFile.exists()) {
+            toast("No compiled EPUB available", Toast.LENGTH_SHORT)
+            return
+        }
+        try {
+            val uri = epubFile.getUriCompat(this)
+            val intent = Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(uri, "application/epub+zip")
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            startActivity(Intent.createChooser(intent, "Open EPUB"))
+        } catch (e: Exception) {
+            toast("Failed to open EPUB: ${e.message}", Toast.LENGTH_LONG)
         }
     }
 

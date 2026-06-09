@@ -30,13 +30,15 @@ class TextAdapter(
     private var novelTitle: String = ""
     private var novelAuthor: String? = null
     private var novelPosterUrl: String? = null
+    private var novelVibrantColor: Int? = null
     private var chapterTitle: String = ""
     private var chapterNumber: Double = 0.0
 
-    fun setNovelInfo(title: String, author: String?, posterUrl: String? = null) {
+    fun setNovelInfo(title: String, author: String?, posterUrl: String? = null, vibrantColor: Int? = null) {
         novelTitle = title
         novelAuthor = author
         novelPosterUrl = posterUrl
+        novelVibrantColor = vibrantColor
     }
 
     fun setChapterInfo(title: String, number: Double) {
@@ -57,6 +59,7 @@ class TextAdapter(
                     view = view,
                     getConfig = { textConfig },
                     getNovelInfo = { Triple(novelTitle, novelAuthor, novelPosterUrl ?: "") },
+                    getNovelColor = { novelVibrantColor },
                     getChapterInfo = { chapterTitle to chapterNumber },
                     getHighlightManager = { highlightManager },
                 )
@@ -142,6 +145,7 @@ class TextAdapter(
         view: View,
         private val getConfig: () -> TextConfig,
         private val getNovelInfo: () -> Triple<String, String?, String>,
+        private val getNovelColor: () -> Int?,
         private val getChapterInfo: () -> Pair<String, Double>,
         private val getHighlightManager: () -> NovelHighlightManager?,
     ) : TextViewHolder(view) {
@@ -205,6 +209,7 @@ class TextAdapter(
                 // Set custom selection action mode callback for Define + Highlight
                 if (textConfig.isTextSelectable) {
                     val (novelTitle, novelAuthor, novelPosterUrl) = getNovelInfo()
+                    val novelVibrantColor = getNovelColor()
                     val (chapterTitle, chapterNumber) = getChapterInfo()
                     val activity = textView.context as? android.app.Activity
                     if (activity != null) {
@@ -231,6 +236,7 @@ class TextAdapter(
                                         paragraphIndex = item.paragraphIndex,
                                         color = colorHex,
                                         posterUrl = novelPosterUrl.takeIf { it.isNotBlank() },
+                                        vibrantCoverColor = novelVibrantColor,
                                     )
                                     // Apply visual span immediately (BackgroundColorSpan works across lines)
                                     if (displayText is android.text.Spannable) {

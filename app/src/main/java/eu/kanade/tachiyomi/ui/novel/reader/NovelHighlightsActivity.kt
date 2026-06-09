@@ -83,6 +83,16 @@ class NovelHighlightsActivity : AppCompatActivity() {
 
         highlightManager = NovelHighlightManager(this)
 
+        // If vibrant color wasn't passed via intent, try to load it from saved highlights JSON
+        if (vibrantColor == null) {
+            val savedData = highlightManager.getAllHighlights(
+                NovelHighlightManager.NovelKey(title = novelTitle, author = novelAuthor)
+            )
+            vibrantColor = savedData.vibrantCoverColor
+            // Also fill in missing posterUrl from saved data
+            if (posterUrl == null) posterUrl = savedData.posterUrl
+        }
+
         setupToolbar()
         setupBackdrop()
         setupRecyclerView()
