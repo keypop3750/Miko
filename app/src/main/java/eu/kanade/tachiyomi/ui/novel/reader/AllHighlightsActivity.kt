@@ -9,6 +9,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.TextView
+import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.graphics.ColorUtils
 import androidx.core.view.isVisible
 import androidx.lifecycle.lifecycleScope
@@ -21,6 +22,7 @@ import eu.kanade.tachiyomi.R
 import eu.kanade.tachiyomi.databinding.ActivityAllHighlightsBinding
 import eu.kanade.tachiyomi.ui.base.activity.BaseThemedActivity
 import eu.kanade.tachiyomi.util.system.ThemeUtil
+import eu.kanade.tachiyomi.util.system.isDarkMode
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -51,6 +53,11 @@ class AllHighlightsActivity : BaseThemedActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        // Force novel theme since this is a novel-specific activity
+        val isDark = isDarkMode(preferences) && preferences.nightMode().get() != AppCompatDelegate.MODE_NIGHT_NO
+        val novelTheme = if (isDark) preferences.novelDarkTheme().get() else preferences.novelLightTheme().get()
+        setTheme(novelTheme.styleRes)
+
         // Use the novel reader theme background
         val readerBg = ThemeUtil.readerBackgroundColor(
             preferences.readerTheme().get(),
@@ -62,7 +69,7 @@ class AllHighlightsActivity : BaseThemedActivity() {
 
         // Apply reader background
         binding.root.setBackgroundColor(readerBg)
-        binding.recyclerView.setBackgroundColor(readerBg)
+        // RecyclerView stays transparent so the theme background shows through gaps
 
         setupToolbar()
         setupRecyclerView()
@@ -191,14 +198,10 @@ class AllHighlightsActivity : BaseThemedActivity() {
                 authorView.text = novel?.author ?: data.author ?: "Unknown Author"
                 authorView.isVisible = true
 
-                // Status from DB (Ongoing/Completed/etc.)
-                val statusText = novel?.let { resolveStatusText(it.status) }
-                if (statusText != null) {
-                    statusView.text = statusText
-                    statusView.isVisible = true
-                } else {
-                    statusView.isVisible = false
-                }
+                // Status from DB (Ongoing/Completed/etc.), fallback to Unknown
+                val statusText = novel?.let { resolveStatusText(it.status) } ?: "Unknown"
+                statusView.text = statusText
+                statusView.isVisible = true
 
                 // Highlight count badge (top-right)
                 val totalHighlights = data.chapters.sumOf { it.highlights.size }
@@ -231,14 +234,14 @@ class AllHighlightsActivity : BaseThemedActivity() {
                 itemView.setOnClickListener { onClick(data, novel) }
             }
 
-            private fun resolveStatusText(status: Int): String? {
+            private fun resolveStatusText(status: Int): String {
                 return when (status) {
                     NovelStatus.ONGOING -> "Ongoing"
                     NovelStatus.COMPLETED -> "Completed"
                     NovelStatus.PAUSED -> "On Hiatus"
                     NovelStatus.DROPPED -> "Cancelled"
                     NovelStatus.STUBBED -> "Stubbed"
-                    else -> null
+                    else -> "Unknown"
                 }
             }
         }

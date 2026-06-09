@@ -14,6 +14,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.TextView
+import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.content.ContextCompat
 import androidx.core.graphics.ColorUtils
 import androidx.core.view.isVisible
@@ -24,6 +25,7 @@ import eu.kanade.tachiyomi.R
 import eu.kanade.tachiyomi.databinding.NovelHighlightsActivityBinding
 import eu.kanade.tachiyomi.ui.base.activity.BaseThemedActivity
 import eu.kanade.tachiyomi.util.system.ThemeUtil
+import eu.kanade.tachiyomi.util.system.isDarkMode
 import coil3.imageLoader
 import coil3.request.ImageRequest
 import coil3.request.target
@@ -75,6 +77,11 @@ class NovelHighlightsActivity : BaseThemedActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // Force novel theme since this is a novel-specific activity
+        val isDark = isDarkMode(preferences) && preferences.nightMode().get() != AppCompatDelegate.MODE_NIGHT_NO
+        val novelTheme = if (isDark) preferences.novelDarkTheme().get() else preferences.novelLightTheme().get()
+        setTheme(novelTheme.styleRes)
 
         // Use the novel reader background for the immersive cover-art backdrop experience
         val readerBg = ThemeUtil.readerBackgroundColor(
@@ -154,8 +161,7 @@ class NovelHighlightsActivity : BaseThemedActivity() {
             window?.statusBarColor = Color.parseColor("#66000000")
         }
 
-        // Apply reader background to RecyclerView so the whole page is themed
-        binding.recyclerView.setBackgroundColor(readerBg)
+        // RecyclerView stays transparent so the backdrop gradient shows through
         binding.emptyView.setTextColor(textColor)
     }
 
@@ -256,9 +262,9 @@ class NovelHighlightsActivity : BaseThemedActivity() {
                             NovelHighlightManager.NovelKey(novelTitle, novelAuthor),
                             chapterNumber,
                             entry.text,
-                            entry.timestamp
+                            entry.timestamp,
+                            onComplete = { loadHighlights() }
                         )
-                        loadHighlights()
                     }
                     else -> { /* EditNote handled inline in adapter */ }
                 }
@@ -269,10 +275,12 @@ class NovelHighlightsActivity : BaseThemedActivity() {
                     chapterNumber,
                     entry.text,
                     entry.timestamp,
-                    note
+                    note,
+                    onComplete = {
+                        // Post to next frame to avoid "Cannot call this method while RecyclerView is computing layout"
+                        binding.recyclerView.post { loadHighlights() }
+                    }
                 )
-                // Post to next frame to avoid "Cannot call this method while RecyclerView is computing layout"
-                binding.recyclerView.post { loadHighlights() }
             }
         )
         binding.recyclerView.layoutManager = LinearLayoutManager(this)

@@ -91,11 +91,15 @@ class NovelHighlightManager(context: Context) {
 
     /**
      * Delete a specific highlight by its text and timestamp.
+     * Calls [onComplete] on the main thread after the file is written.
      */
-    fun deleteHighlight(novelKey: NovelKey, chapterNumber: Double, highlightText: String, timestamp: Long) {
+    fun deleteHighlight(novelKey: NovelKey, chapterNumber: Double, highlightText: String, timestamp: Long, onComplete: (() -> Unit)? = null) {
         kotlinx.coroutines.GlobalScope.launch(Dispatchers.IO) {
             val data = loadData(novelKey)
-            val chapter = data.chapters.find { it.chapterNumber == chapterNumber } ?: return@launch
+            val chapter = data.chapters.find { it.chapterNumber == chapterNumber } ?: run {
+                withContext(Dispatchers.Main) { onComplete?.invoke() }
+                return@launch
+            }
             val updatedHighlights = chapter.highlights.filterNot {
                 it.text == highlightText && it.timestamp == timestamp
             }
@@ -112,16 +116,21 @@ class NovelHighlightManager(context: Context) {
                 writeJson(novelKey, updatedData)
                 exportToMd(novelKey, updatedData)
             }
+            withContext(Dispatchers.Main) { onComplete?.invoke() }
         }
     }
 
     /**
      * Update the note for a specific highlight.
+     * Calls [onComplete] on the main thread after the file is written.
      */
-    fun updateHighlightNote(novelKey: NovelKey, chapterNumber: Double, highlightText: String, timestamp: Long, note: String?) {
+    fun updateHighlightNote(novelKey: NovelKey, chapterNumber: Double, highlightText: String, timestamp: Long, note: String?, onComplete: (() -> Unit)? = null) {
         kotlinx.coroutines.GlobalScope.launch(Dispatchers.IO) {
             val data = loadData(novelKey)
-            val chapter = data.chapters.find { it.chapterNumber == chapterNumber } ?: return@launch
+            val chapter = data.chapters.find { it.chapterNumber == chapterNumber } ?: run {
+                withContext(Dispatchers.Main) { onComplete?.invoke() }
+                return@launch
+            }
             val updatedHighlights = chapter.highlights.map {
                 if (it.text == highlightText && it.timestamp == timestamp) {
                     it.copy(note = note)
@@ -132,6 +141,7 @@ class NovelHighlightManager(context: Context) {
             val updatedData = data.copy(chapters = updatedChapters)
             writeJson(novelKey, updatedData)
             exportToMd(novelKey, updatedData)
+            withContext(Dispatchers.Main) { onComplete?.invoke() }
         }
     }
 

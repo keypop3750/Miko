@@ -47,7 +47,7 @@ WHERE _id = :novelId;
 findNovelByTitle:
 SELECT *
 FROM novels
-WHERE title = :title
+WHERE LOWER(title) = LOWER(:title)
 LIMIT 1;
 
 findFavoriteNovels:
