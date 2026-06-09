@@ -810,6 +810,9 @@ class NovelDetailsControllerNew : BaseCoroutineController<NovelDetailsController
                 setQuery(searchQuery, false)
             }
         }
+
+        // Show Export EPUB only if a compiled EPUB exists
+        menu.findItem(R.id.action_export_epub)?.isVisible = presenter.hasCompiledEpub()
     }
 
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
@@ -824,6 +827,10 @@ class NovelDetailsControllerNew : BaseCoroutineController<NovelDetailsController
                         posterUrl = novel.posterUrl,
                     )
                 )
+                return true
+            }
+            R.id.action_export_epub -> {
+                exportEpub()
                 return true
             }
             R.id.action_edit -> {
@@ -1024,6 +1031,36 @@ class NovelDetailsControllerNew : BaseCoroutineController<NovelDetailsController
         
         presenter.deleteDownloadedChapters(downloadedNonBookmarked)
         activity?.toast("Deleted ${downloadedNonBookmarked.size} download(s)")
+    }
+
+    private fun exportEpub() {
+        val epubFile = presenter.getCompiledEpub()
+        val novel = presenter.novelValue ?: return
+        if (epubFile == null) {
+            activity?.toast("No compiled EPUB available")
+            return
+        }
+
+        try {
+            val downloadsDir = android.os.Environment.getExternalStoragePublicDirectory(
+                android.os.Environment.DIRECTORY_DOWNLOADS
+            )
+            val safeName = novel.title.replace(Regex("[^a-zA-Z0-9\\s]"), " ").trim()
+            val destFile = java.io.File(downloadsDir, "$safeName.epub")
+
+            // Handle duplicate names
+            var counter = 1
+            var finalDest = destFile
+            while (finalDest.exists()) {
+                finalDest = java.io.File(downloadsDir, "$safeName ($counter).epub")
+                counter++
+            }
+
+            epubFile.copyTo(finalDest, overwrite = false)
+            activity?.toast("Exported EPUB to Downloads: ${finalDest.name}")
+        } catch (e: Exception) {
+            activity?.toast("Failed to export EPUB: ${e.message}")
+        }
     }
     
     //endregion

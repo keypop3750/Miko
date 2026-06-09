@@ -1075,7 +1075,38 @@ class NovelDetailsPresenter(
         val currentNovel = _novel.value ?: return 0
         return downloadManager.getDownloadCount(currentNovel)
     }
-    
+
+    /**
+     * Check if a compiled offline EPUB exists for this novel.
+     */
+    fun hasCompiledEpub(): Boolean {
+        val currentNovel = _novel.value ?: return false
+        return downloadManager.getCompiledEpub(currentNovel) != null
+    }
+
+    /**
+     * Get the compiled EPUB file for this novel.
+     */
+    fun getCompiledEpub(): java.io.File? {
+        val currentNovel = _novel.value ?: return null
+        return downloadManager.getCompiledEpub(currentNovel)
+    }
+
+    /**
+     * Manually trigger EPUB compilation for already-downloaded chapters.
+     * Useful for chapters downloaded before the EPUB feature was added.
+     */
+    fun compileEpub() {
+        val currentNovel = _novel.value ?: return
+        presenterScope.launchIO {
+            try {
+                downloadManager.compileEpub(currentNovel)
+            } catch (e: Exception) {
+                logger.e(e) { "Failed to compile EPUB" }
+            }
+        }
+    }
+
     private fun handleError(e: Exception, context: String) {
         val message = when (e) {
             is java.net.UnknownHostException -> "No internet connection"

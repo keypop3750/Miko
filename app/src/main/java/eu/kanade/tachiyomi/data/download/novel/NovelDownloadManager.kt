@@ -17,6 +17,7 @@ import uy.kohesive.injekt.injectLazy
 import yokai.domain.novel.Novel
 import yokai.source.novel.NovelProviderRegistry
 import java.io.File
+import java.net.URL
 
 // Type aliases for the two different NovelChapter types
 typealias PresenterNovelChapter = yokai.domain.novelchapter.models.NovelChapter
@@ -57,7 +58,10 @@ class NovelDownloadManager(private val context: Context) {
     // Active downloads for progress tracking
     private val _activeDownloads = MutableStateFlow<Map<Long, DownloadState>>(emptyMap())
     val activeDownloads: StateFlow<Map<Long, DownloadState>> = _activeDownloads.asStateFlow()
-    
+
+    // Track which novels need EPUB rebuild after downloads complete
+    private val _novelsToCompile = mutableMapOf<Long, Novel>()
+
     companion object {
         private const val TAG = "NovelDownloadManager"
         private const val CHAPTER_FILE_EXTENSION = ".txt"
@@ -90,6 +94,14 @@ class NovelDownloadManager(private val context: Context) {
     
     private fun getChapterFile(novel: Novel, chapterId: Long): File {
         return File(getNovelDirectory(novel), "${chapterId}$CHAPTER_FILE_EXTENSION")
+    }
+
+    private fun getPosterFileInternal(novel: Novel): File {
+        return File(getNovelDirectory(novel), "poster.jpg")
+    }
+
+    private fun getEpubFile(novel: Novel): File {
+        return File(getNovelDirectory(novel), "local_epub.epub")
     }
     
     // ========== Public API for PresenterNovelChapter (NovelDetailsPresenter) ==========
@@ -201,17 +213,47 @@ class NovelDownloadManager(private val context: Context) {
                 val newDownloads = chapters
                     .filter { !isChapterDownloadedById(novel, it.id) }
                     .map { NovelDownload(novel, it, DownloadState.PENDING) }
-                
+
                 val currentQueue = _downloadQueue.value.toMutableList()
                 currentQueue.addAll(newDownloads)
                 _downloadQueue.value = currentQueue
-                
+
+                // Mark novel for EPUB rebuild
+                _novelsToCompile[novel.id] = novel
+
                 Logger.d(TAG) { "Queued ${newDownloads.size} chapters for download" }
             }
-            
+
+            // Download cover image in parallel
+            downloadPoster(novel)
+
             // Start processing if not already running
             if (!_isDownloading.value) {
                 processQueue()
+            }
+        }
+    }
+
+    /**
+     * Download the novel cover/poster image for use in the compiled EPUB.
+     */
+    private fun downloadPoster(novel: Novel) {
+        scope.launch(Dispatchers.IO) {
+            val posterUrl = novel.posterUrl ?: return@launch
+            val posterFile = getPosterFileInternal(novel)
+            if (posterFile.exists() && posterFile.length() > 0) return@launch
+
+            try {
+                val url = URL(posterUrl)
+                url.openStream().use { input ->
+                    posterFile.parentFile?.mkdirs()
+                    posterFile.outputStream().use { output ->
+                        input.copyTo(output)
+                    }
+                }
+                Logger.d(TAG) { "Downloaded poster for ${novel.title}" }
+            } catch (e: Exception) {
+                Logger.w(TAG) { "Failed to download poster: ${e.message}" }
             }
         }
     }
@@ -252,6 +294,7 @@ class NovelDownloadManager(private val context: Context) {
             val file = getChapterFile(novel, chapterId)
             if (file.exists()) {
                 file.delete()
+                invalidateEpub(novel)
                 Logger.d(TAG) { "Deleted chapter: $title" }
             }
         } catch (e: Exception) {
@@ -264,14 +307,14 @@ class NovelDownloadManager(private val context: Context) {
      */
     private suspend fun processQueue() {
         _isDownloading.value = true
-        
+
         while (_downloadQueue.value.isNotEmpty()) {
             val download = downloadMutex.withLock {
                 _downloadQueue.value.firstOrNull { it.state == DownloadState.PENDING }
             } ?: break
-            
+
             val success = downloadChapterInfo(download.novel, download.chapter)
-            
+
             downloadMutex.withLock {
                 val updatedQueue = _downloadQueue.value.toMutableList()
                 val index = updatedQueue.indexOfFirst { it.chapter.id == download.chapter.id }
@@ -286,8 +329,53 @@ class NovelDownloadManager(private val context: Context) {
                 }
             }
         }
-        
+
         _isDownloading.value = false
+
+        // Compile EPUBs for novels that had chapters downloaded
+        compileQueuedEpubs()
+    }
+
+    /**
+     * Compile EPUBs for all novels that had chapters downloaded in this session.
+     */
+    private suspend fun compileQueuedEpubs() {
+        val novelsToCompile = downloadMutex.withLock {
+            val snapshot = _novelsToCompile.values.toList()
+            _novelsToCompile.clear()
+            snapshot
+        }
+
+        novelsToCompile.forEach { novel ->
+            compileNovelEpub(novel)
+        }
+    }
+
+    /**
+     * Compile all downloaded chapters for a novel into an EPUB.
+     */
+    private suspend fun compileNovelEpub(novel: Novel) {
+        try {
+            val novelDir = getNovelDirectory(novel)
+            val chapterFiles = novelDir
+                .listFiles { f -> f.isFile && f.extension == "txt" && f.name != "poster.jpg" }
+                ?.sortedBy { it.nameWithoutExtension.toLongOrNull() ?: 0L }
+                ?: emptyList()
+
+            if (chapterFiles.isEmpty()) return
+
+            val posterFile = getPosterFileInternal(novel)
+            NovelEpubCompiler.compile(
+                context = context,
+                novel = novel,
+                author = novel.author,
+                synopsis = novel.description,
+                posterFile = posterFile.takeIf { it.exists() },
+                chapterFiles = chapterFiles,
+            )
+        } catch (e: Exception) {
+            Logger.e(TAG) { "EPUB compilation failed: ${e.message}" }
+        }
     }
     
     /**
@@ -311,6 +399,25 @@ class NovelDownloadManager(private val context: Context) {
             Logger.e(TAG) { "Failed to delete novel downloads: ${e.message}" }
         }
     }
+
+    /**
+     * Get the compiled EPUB file for a novel if it exists and is valid.
+     */
+    fun getCompiledEpub(novel: Novel): File? {
+        val file = getEpubFile(novel)
+        return if (file.exists() && file.length() > NovelEpubCompiler.LOCAL_EPUB_MIN_SIZE) file else null
+    }
+
+    /**
+     * Delete the compiled EPUB for a novel (forces rebuild on next access).
+     */
+    fun invalidateEpub(novel: Novel) {
+        val file = getEpubFile(novel)
+        if (file.exists()) {
+            file.delete()
+            Logger.d(TAG) { "Invalidated EPUB for ${novel.title}" }
+        }
+    }
     
     /**
      * Get download count for a novel
@@ -320,6 +427,32 @@ class NovelDownloadManager(private val context: Context) {
         return dir.listFiles()?.count { it.extension == "txt" } ?: 0
     }
     
+    /**
+     * Compile all downloaded chapters into an EPUB for offline reading.
+     * Can be called manually for chapters downloaded before auto-compilation.
+     */
+    suspend fun compileEpub(novel: Novel) {
+        compileNovelEpub(novel)
+    }
+
+    /**
+     * Get all downloaded chapter files for a novel, sorted by chapter ID.
+     */
+    fun getDownloadedChapterFiles(novel: Novel): List<File> {
+        val dir = getNovelDirectory(novel)
+        return dir
+            .listFiles { f -> f.isFile && f.extension == "txt" }
+            ?.sortedBy { it.nameWithoutExtension.toLongOrNull() ?: 0L }
+            ?: emptyList()
+    }
+
+    /**
+     * Get the downloaded poster/cover file for a novel.
+     */
+    fun getPosterFile(novel: Novel): File {
+        return getPosterFileInternal(novel)
+    }
+
     /**
      * Cancel pending downloads for a novel
      */

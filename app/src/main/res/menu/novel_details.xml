@@ -76,6 +76,12 @@
         app:showAsAction="never" />
 
     <item
+        android:id="@+id/action_export_epub"
+        android:icon="@drawable/ic_file_download_24dp"
+        android:title="Export EPUB"
+        app:showAsAction="never" />
+
+    <item
         android:id="@+id/action_edit"
         android:icon="@drawable/ic_edit_24dp"
         android:title="@string/edit"
