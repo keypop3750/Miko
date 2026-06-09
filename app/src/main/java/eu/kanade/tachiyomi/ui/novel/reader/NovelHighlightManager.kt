@@ -310,6 +310,7 @@ class NovelHighlightManager(context: Context) {
         val title: String,
         val author: String? = null,
         val description: String? = null,
+        val novelId: Long? = null,
     ) {
         /** Title-only sanitized filename (new format) */
         fun titleFileName(): String {
@@ -334,6 +335,7 @@ class NovelHighlightManager(context: Context) {
         val description: String? = null,
         val posterUrl: String? = null,
         val vibrantCoverColor: Int? = null,
+        val novelId: Long? = null,
         val chapters: List<ChapterHighlights> = emptyList(),
     )
 

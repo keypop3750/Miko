@@ -25,6 +25,7 @@ import eu.kanade.tachiyomi.ui.reader.viewer.GestureDetectorWithLongTap
 import eu.kanade.tachiyomi.ui.base.activity.BaseActivity
 import eu.kanade.tachiyomi.ui.webview.WebViewActivity
 import eu.kanade.tachiyomi.util.storage.getUriCompat
+import eu.kanade.tachiyomi.util.system.dpToPx
 import eu.kanade.tachiyomi.util.system.getResourceColor
 import eu.kanade.tachiyomi.util.system.isInNightMode
 import eu.kanade.tachiyomi.util.system.toast
@@ -132,16 +133,20 @@ class NovelReaderActivity : BaseActivity<NovelReaderActivityBinding>() {
     private val chaptersButton: ImageButton by lazy {
         findViewById(R.id.chapters_button)
     }
-    private val readingProgressText: TextView by lazy {
-        findViewById(R.id.reading_progress_text)
+    private val highlightsButton: ImageButton by lazy {
+        findViewById(R.id.highlights_button)
+    }
+    private val settingsButton: ImageButton by lazy {
+        findViewById(R.id.settings_button)
     }
 
     private val highlightManager: NovelHighlightManager by lazy {
         NovelHighlightManager(this)
     }
-    private val infoButton: ImageButton by lazy { 
-        findViewById(R.id.info_button) 
+    private val infoButton: ImageButton by lazy {
+        findViewById(R.id.info_button)
     }
+    private var toolbarProgressView: TextView? = null
     // REMOVED: Navigation buttons (nav_layout removed from layout)
     // private val leftChapterButton: ImageButton by lazy {
     //     findViewById(R.id.left_chapter)
@@ -347,10 +352,12 @@ class NovelReaderActivity : BaseActivity<NovelReaderActivityBinding>() {
         binding.toolbar.setSubtitleTextColor(if (isLightBg) android.graphics.Color.parseColor("#DE000000") else getResourceColor(R.attr.actionBarTintColor))
         binding.toolbar.navigationIcon?.setTint(overlayTextColor)
 
-        // Theme bottom sheet and progress text
+        // Theme bottom sheet and buttons
         bottomSheet.setBackgroundColor(bottomSheetBg)
         chaptersButton.setColorFilter(overlayTextColor)
-        readingProgressText.setTextColor(overlayTextColor)
+        findViewById<ImageButton>(R.id.webview_button)?.setColorFilter(overlayTextColor)
+        highlightsButton.setColorFilter(overlayTextColor)
+        settingsButton.setColorFilter(overlayTextColor)
 
         // Update loading indicator theme when theme changes (Phase 0)
         binding.loadingIndicator.setInvertMode(isInvertedFromTheme())
@@ -369,13 +376,28 @@ class NovelReaderActivity : BaseActivity<NovelReaderActivityBinding>() {
         setSupportActionBar(binding.toolbar)
         supportActionBar?.setDisplayHomeAsUpEnabled(true)
         supportActionBar?.setDisplayShowTitleEnabled(true)
-        
+
         // Set toolbar background (90% alpha surface for brighter overlay)
         binding.appBar.setBackgroundColor(getColor(R.color.surface_alpha))
-        
+
         // Tint navigation icon (back button) to match theme
         binding.toolbar.navigationIcon?.setTint(getResourceColor(R.attr.actionBarTintColor))
-        
+
+        // Add reading progress text to the right side of the toolbar
+        toolbarProgressView = TextView(this).apply {
+            textSize = 14f
+            setTextColor(getResourceColor(R.attr.actionBarTintColor))
+            gravity = android.view.Gravity.CENTER_VERTICAL
+            text = "0%"
+        }
+        val params = androidx.appcompat.widget.Toolbar.LayoutParams(
+            androidx.appcompat.widget.Toolbar.LayoutParams.WRAP_CONTENT,
+            androidx.appcompat.widget.Toolbar.LayoutParams.WRAP_CONTENT,
+            android.view.Gravity.END or android.view.Gravity.CENTER_VERTICAL,
+        )
+        params.marginEnd = 16.dpToPx
+        binding.toolbar.addView(toolbarProgressView, params)
+
         // Initially hide toolbar
         binding.appBar.isVisible = false
     }
@@ -389,8 +411,25 @@ class NovelReaderActivity : BaseActivity<NovelReaderActivityBinding>() {
             toggleBottomSheet()
         }
         
-        // Reading progress text is updated via updateToolbarInfo / updateReadingProgress
-        // No additional click listeners needed for the progress display
+        // Webview button - Open chapter in webview (like manga reader)
+        findViewById<ImageButton>(R.id.webview_button).setOnClickListener {
+            val chapter = viewModel.currentChapter.value ?: return@setOnClickListener
+            val intent = WebViewActivity.newIntent(
+                this,
+                chapter.url,
+                null,
+                chapter.title
+            )
+            startActivity(intent)
+        }
+        
+        highlightsButton.setOnClickListener {
+            showHighlightsDialog()
+        }
+        
+        settingsButton.setOnClickListener {
+            eu.kanade.tachiyomi.ui.novel.reader.settings.NovelReaderSettingsSheet(this).show()
+        }
         
         // REMOVED: Navigation button click listeners (buttons removed with nav_layout)
         // leftChapterButton.setOnClickListener {
@@ -1103,8 +1142,8 @@ class NovelReaderActivity : BaseActivity<NovelReaderActivityBinding>() {
         lastProgressPercent = percent
         val chapter = currentChapter
         val chapterTitle = chapter?.let { NovelChapterAdapter.cleanChapterTitle(it.title) } ?: ""
-        supportActionBar?.subtitle = "$chapterTitle  ·  $percent%"
-        updateReadingProgressText()
+        supportActionBar?.subtitle = chapterTitle
+        toolbarProgressView?.text = "$percent%"
     }
     
     /**
@@ -1347,32 +1386,6 @@ class NovelReaderActivity : BaseActivity<NovelReaderActivityBinding>() {
             val chapterTitle = if (chapter != null) NovelChapterAdapter.cleanChapterTitle(chapter.title) else "Chapter"
             val percent = lastProgressPercent
             subtitle = if (percent >= 0) "$chapterTitle  ·  $percent%" else chapterTitle
-        }
-        updateReadingProgressText()
-    }
-
-    private fun updateReadingProgressText() {
-        val chapter = currentChapter
-        val novel = this.novel
-        if (chapter != null && novel != null) {
-            lifecycleScope.launch {
-                try {
-                    val chapters = viewModel.chapters.value
-                    val totalChapters = chapters.size
-                    val currentIndex = chapters.indexOfFirst { it.id == chapter.id } + 1
-                    val chapterTitle = NovelChapterAdapter.cleanChapterTitle(chapter.title)
-                    val percent = lastProgressPercent.coerceIn(0, 100)
-                    readingProgressText.text = if (currentIndex > 0 && totalChapters > 0) {
-                        "$chapterTitle ($currentIndex / $totalChapters) · $percent%"
-                    } else {
-                        "$chapterTitle · $percent%"
-                    }
-                } catch (_: Exception) {
-                    readingProgressText.text = NovelChapterAdapter.cleanChapterTitle(chapter.title)
-                }
-            }
-        } else {
-            readingProgressText.text = ""
         }
     }
 

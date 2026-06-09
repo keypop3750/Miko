@@ -83,53 +83,34 @@ class AllHighlightsActivity : BaseThemedActivity() {
         loadNovels()
     }
 
-    private suspend fun findNovelByTitleFuzzy(title: String): Novel? {
-        val trimmed = title.trim()
-        if (trimmed.isEmpty()) return null
-
-        // 1. Exact case-insensitive match via SQL
-        novelRepository.getNovelByTitle(trimmed)?.let { return it }
-
-        // 2. Normalized whitespace
-        val normalized = trimmed.replace(Regex("\\s+"), " ")
-        if (normalized != trimmed) {
-            novelRepository.getNovelByTitle(normalized)?.let { return it }
+    private suspend fun findNovelForHighlights(data: NovelHighlightManager.NovelHighlightsData): Novel? {
+        // 1. If JSON has a novelId, look up directly by ID (most reliable)
+        data.novelId?.let { id ->
+            novelRepository.getNovelById(id)?.let { return it }
         }
 
-        // 3. Fuzzy search against all novels in memory
-        return try {
-            val allNovels = novelRepository.getAllNovels().first()
-            val searchLower = normalized.lowercase()
-            val searchAlpha = searchLower.replace(Regex("[^a-z0-9\\s]"), "").trim()
+        val trimmed = data.novelTitle.trim()
 
-            allNovels.find { it.title.trim().lowercase() == searchLower }
-                // Novel title contains the search query
-                ?: allNovels.find { it.title.trim().lowercase().contains(searchLower) }
-                // Search query contains the novel title
-                ?: allNovels.find { searchLower.contains(it.title.trim().lowercase()) }
-                // Alphanumeric-only match (ignores punctuation, symbols)
-                ?: run {
-                    allNovels.find {
-                        val novelAlpha = it.title.trim().lowercase().replace(Regex("[^a-z0-9\\s]"), "").trim()
-                        novelAlpha == searchAlpha || novelAlpha.contains(searchAlpha) || searchAlpha.contains(novelAlpha)
-                    }
-                }
-                // Word-overlap scoring (best partial match)
-                ?: run {
-                    val searchWords = searchLower.split(Regex("\\s+")).filter { it.length > 2 }.toSet()
-                    if (searchWords.isEmpty()) return@run null
-                    allNovels.maxByOrNull { novel ->
-                        val novelWords = novel.title.trim().lowercase().split(Regex("\\s+")).filter { it.length > 2 }.toSet()
-                        val intersection = searchWords.intersect(novelWords).size
-                        val union = searchWords.union(novelWords).size
-                        if (union == 0) 0f else intersection.toFloat() / union.toFloat()
-                    }?.takeIf { candidate ->
-                        val candidateWords = candidate.title.trim().lowercase().split(Regex("\\s+")).filter { it.length > 2 }.toSet()
-                        val intersection = searchWords.intersect(candidateWords).size
-                        intersection >= searchWords.size / 2 || intersection >= 2
-                    }
-                }
-        } catch (_: Exception) { null }
+        // 2. Exact case-insensitive title match
+        novelRepository.getNovelByTitle(trimmed)?.let { return it }
+
+        // 3. If title match fails, try matching by posterUrl (exact, unique per novel)
+        if (!data.posterUrl.isNullOrBlank()) {
+            try {
+                val allNovels = novelRepository.getAllNovels().first()
+                allNovels.find { !it.posterUrl.isNullOrBlank() && it.posterUrl == data.posterUrl }?.let { return it }
+            } catch (_: Exception) { }
+        }
+
+        // 4. If posterUrl fails, try matching by vibrantCoverColor (exact)
+        if (data.vibrantCoverColor != null) {
+            try {
+                val allNovels = novelRepository.getAllNovels().first()
+                allNovels.find { it.vibrantCoverColor == data.vibrantCoverColor }?.let { return it }
+            } catch (_: Exception) { }
+        }
+
+        return null
     }
 
     private fun getResourceColor(attr: Int): Int {
@@ -182,10 +163,10 @@ class AllHighlightsActivity : BaseThemedActivity() {
             val manager = NovelHighlightManager(this@AllHighlightsActivity)
             val highlightNovels = manager.getAllNovelsWithHighlights()
 
-            // Look up each novel in the DB by title for accurate metadata
+            // Look up each novel in the DB for accurate metadata (author, status, cover)
             val enrichedList = withContext(Dispatchers.IO) {
                 highlightNovels.map { data ->
-                    val dbNovel = findNovelByTitleFuzzy(data.novelTitle)
+                    val dbNovel = findNovelForHighlights(data)
                     HighlightItem(data, dbNovel)
                 }
             }

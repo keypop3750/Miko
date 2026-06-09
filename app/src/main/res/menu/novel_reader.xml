@@ -2,6 +2,8 @@
 <menu xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
 
+    <!-- Top-right action icons removed; reading progress is shown instead via custom toolbar view -->
+
     <item
         android:id="@+id/action_open_epub"
         android:icon="@drawable/ic_file_download_24dp"

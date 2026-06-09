@@ -35,6 +35,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
@@ -322,11 +323,24 @@ class NovelHighlightsActivity : BaseThemedActivity() {
 
     private suspend fun navigateToHighlight(chapterNumber: Double, paragraphIndex: Int) {
         withContext(Dispatchers.IO) {
-            val novel = novelRepository.getNovelByTitle(novelTitle)
-                ?: run {
-                    withContext(Dispatchers.Main) { toast("Novel not found in library", android.widget.Toast.LENGTH_SHORT) }
-                    return@withContext
-                }
+            // Try title first, then posterUrl, then vibrantColor
+            var novel = novelRepository.getNovelByTitle(novelTitle)
+            if (novel == null && !posterUrl.isNullOrBlank()) {
+                try {
+                    val allNovels = novelRepository.getAllNovels().first()
+                    novel = allNovels.find { !it.posterUrl.isNullOrBlank() && it.posterUrl == posterUrl }
+                } catch (_: Exception) { }
+            }
+            if (novel == null && vibrantColor != null) {
+                try {
+                    val allNovels = novelRepository.getAllNovels().first()
+                    novel = allNovels.find { it.vibrantCoverColor == vibrantColor }
+                } catch (_: Exception) { }
+            }
+            if (novel == null) {
+                withContext(Dispatchers.Main) { toast("Novel not found in library", android.widget.Toast.LENGTH_SHORT) }
+                return@withContext
+            }
             val chapters = novelRepository.getChaptersByNovelIdOnce(novel.id)
             val targetChapter = chapters.find { it.chapterNumber == chapterNumber }
                 ?: chapters.find { kotlin.math.abs(it.chapterNumber - chapterNumber) < 0.1 }
@@ -501,26 +515,41 @@ class NovelHighlightsActivity : BaseThemedActivity() {
 
             private fun showNoteDialog(entry: NovelHighlightManager.HighlightEntry, chapterNumber: Double) {
                 val noteText = entry.note ?: ""
-                val options = arrayOf("Find in chapter", "Edit note", "Delete highlight", "Close")
-                com.google.android.material.dialog.MaterialAlertDialogBuilder(itemView.context)
-                    .setTitle("Note")
-                    .setMessage(noteText)
-                    .setItems(options) { _, which ->
-                        when (which) {
-                            0 -> onAction(HighlightAction.Find(entry.paragraphIndex), entry, chapterNumber)
-                            1 -> {
-                                noteView.isVisible = false
-                                noteInput.isVisible = true
-                                noteInput.setText(noteText)
-                                noteInput.requestFocus()
-                                val imm = itemView.context.getSystemService(android.content.Context.INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager
-                                imm.showSoftInput(noteInput, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT)
-                            }
-                            2 -> onAction(HighlightAction.Delete, entry, chapterNumber)
-                            3 -> { /* Close: dismiss handled automatically */ }
-                        }
-                    }
-                    .show()
+                val dialogView = LayoutInflater.from(itemView.context).inflate(R.layout.dialog_highlight_note, null)
+                val noteTextView = dialogView.findViewById<TextView>(R.id.dialog_note_text)
+                val findButton = dialogView.findViewById<com.google.android.material.button.MaterialButton>(R.id.button_find)
+                val editButton = dialogView.findViewById<com.google.android.material.button.MaterialButton>(R.id.button_edit)
+                val deleteButton = dialogView.findViewById<com.google.android.material.button.MaterialButton>(R.id.button_delete)
+                val closeButton = dialogView.findViewById<com.google.android.material.button.MaterialButton>(R.id.button_close)
+
+                noteTextView.text = noteText
+
+                val dialog = androidx.appcompat.app.AlertDialog.Builder(itemView.context)
+                    .setView(dialogView)
+                    .create()
+
+                findButton.setOnClickListener {
+                    dialog.dismiss()
+                    onAction(HighlightAction.Find(entry.paragraphIndex), entry, chapterNumber)
+                }
+                editButton.setOnClickListener {
+                    dialog.dismiss()
+                    noteView.isVisible = false
+                    noteInput.isVisible = true
+                    noteInput.setText(noteText)
+                    noteInput.requestFocus()
+                    val imm = itemView.context.getSystemService(android.content.Context.INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager
+                    imm.showSoftInput(noteInput, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT)
+                }
+                deleteButton.setOnClickListener {
+                    dialog.dismiss()
+                    onAction(HighlightAction.Delete, entry, chapterNumber)
+                }
+                closeButton.setOnClickListener {
+                    dialog.dismiss()
+                }
+
+                dialog.show()
             }
 
             private fun showActions(entry: NovelHighlightManager.HighlightEntry, chapterNumber: Double) {

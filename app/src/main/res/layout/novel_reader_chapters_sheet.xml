@@ -51,21 +51,7 @@
             app:srcCompat="@drawable/ic_format_list_numbered_24dp"
             app:tint="?actionBarTintColor" />
 
-        <!-- 2. Reading progress text -->
-        <TextView
-            android:id="@+id/reading_progress_text"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:gravity="center"
-            android:textAppearance="?textAppearanceBodyMedium"
-            android:textColor="?actionBarTintColor"
-            app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintStart_toEndOf="@id/chapters_button"
-            app:layout_constraintTop_toTopOf="parent"
-            tools:text="Chapter 12 of 50" />
-
-        <!-- Hidden buttons (kept for ViewBinding compat) -->
+        <!-- 2. Webview button - Open chapter in webview -->
         <ImageButton
             android:id="@+id/webview_button"
             android:layout_width="0dp"
@@ -74,7 +60,6 @@
             android:contentDescription="@string/open_in_webview"
             android:padding="@dimen/material_layout_keylines_screen_edge_margin"
             android:tooltipText="@string/open_in_webview"
-            android:visibility="gone"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintEnd_toStartOf="@id/highlights_button"
             app:layout_constraintStart_toEndOf="@id/chapters_button"
@@ -83,6 +68,7 @@
             app:srcCompat="@drawable/ic_open_in_webview_24dp"
             app:tint="?actionBarTintColor" />
 
+        <!-- 3. Highlights button - View highlighted text (future feature) -->
         <ImageButton
             android:id="@+id/highlights_button"
             android:layout_width="0dp"
@@ -91,7 +77,6 @@
             android:contentDescription="@string/edit"
             android:padding="@dimen/material_layout_keylines_screen_edge_margin"
             android:tooltipText="@string/edit"
-            android:visibility="gone"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintEnd_toStartOf="@id/settings_button"
             app:layout_constraintStart_toEndOf="@id/webview_button"
@@ -100,6 +85,7 @@
             app:srcCompat="@drawable/ic_bookmark_24dp"
             app:tint="?actionBarTintColor" />
 
+        <!-- 4. Settings button - Text display settings (cog icon) -->
         <ImageButton
             android:id="@+id/settings_button"
             android:layout_width="wrap_content"
@@ -108,7 +94,6 @@
             android:contentDescription="@string/reader_settings"
             android:padding="@dimen/material_layout_keylines_screen_edge_margin"
             android:tooltipText="@string/reader_settings"
-            android:visibility="gone"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toEndOf="@id/highlights_button"
