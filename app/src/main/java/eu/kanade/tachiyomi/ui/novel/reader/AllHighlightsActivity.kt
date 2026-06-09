@@ -85,22 +85,50 @@ class AllHighlightsActivity : BaseThemedActivity() {
 
     private suspend fun findNovelByTitleFuzzy(title: String): Novel? {
         val trimmed = title.trim()
-        // Exact case-insensitive match
+        if (trimmed.isEmpty()) return null
+
+        // 1. Exact case-insensitive match via SQL
         novelRepository.getNovelByTitle(trimmed)?.let { return it }
 
-        // Normalized whitespace
+        // 2. Normalized whitespace
         val normalized = trimmed.replace(Regex("\\s+"), " ")
         if (normalized != trimmed) {
             novelRepository.getNovelByTitle(normalized)?.let { return it }
         }
 
-        // Fuzzy: search all novels for best match
+        // 3. Fuzzy search against all novels in memory
         return try {
             val allNovels = novelRepository.getAllNovels().first()
             val searchLower = normalized.lowercase()
+            val searchAlpha = searchLower.replace(Regex("[^a-z0-9\\s]"), "").trim()
+
             allNovels.find { it.title.trim().lowercase() == searchLower }
+                // Novel title contains the search query
                 ?: allNovels.find { it.title.trim().lowercase().contains(searchLower) }
+                // Search query contains the novel title
                 ?: allNovels.find { searchLower.contains(it.title.trim().lowercase()) }
+                // Alphanumeric-only match (ignores punctuation, symbols)
+                ?: run {
+                    allNovels.find {
+                        val novelAlpha = it.title.trim().lowercase().replace(Regex("[^a-z0-9\\s]"), "").trim()
+                        novelAlpha == searchAlpha || novelAlpha.contains(searchAlpha) || searchAlpha.contains(novelAlpha)
+                    }
+                }
+                // Word-overlap scoring (best partial match)
+                ?: run {
+                    val searchWords = searchLower.split(Regex("\\s+")).filter { it.length > 2 }.toSet()
+                    if (searchWords.isEmpty()) return@run null
+                    allNovels.maxByOrNull { novel ->
+                        val novelWords = novel.title.trim().lowercase().split(Regex("\\s+")).filter { it.length > 2 }.toSet()
+                        val intersection = searchWords.intersect(novelWords).size
+                        val union = searchWords.union(novelWords).size
+                        if (union == 0) 0f else intersection.toFloat() / union.toFloat()
+                    }?.takeIf { candidate ->
+                        val candidateWords = candidate.title.trim().lowercase().split(Regex("\\s+")).filter { it.length > 2 }.toSet()
+                        val intersection = searchWords.intersect(candidateWords).size
+                        intersection >= searchWords.size / 2 || intersection >= 2
+                    }
+                }
         } catch (_: Exception) { null }
     }
 

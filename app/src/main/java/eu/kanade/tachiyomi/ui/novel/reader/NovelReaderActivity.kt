@@ -132,11 +132,8 @@ class NovelReaderActivity : BaseActivity<NovelReaderActivityBinding>() {
     private val chaptersButton: ImageButton by lazy {
         findViewById(R.id.chapters_button)
     }
-    private val highlightsButton: ImageButton by lazy {
-        findViewById(R.id.highlights_button)
-    }
-    private val settingsButton: ImageButton by lazy {
-        findViewById(R.id.settings_button)
+    private val readingProgressText: TextView by lazy {
+        findViewById(R.id.reading_progress_text)
     }
 
     private val highlightManager: NovelHighlightManager by lazy {
@@ -350,12 +347,10 @@ class NovelReaderActivity : BaseActivity<NovelReaderActivityBinding>() {
         binding.toolbar.setSubtitleTextColor(if (isLightBg) android.graphics.Color.parseColor("#DE000000") else getResourceColor(R.attr.actionBarTintColor))
         binding.toolbar.navigationIcon?.setTint(overlayTextColor)
 
-        // Theme bottom sheet and buttons
+        // Theme bottom sheet and progress text
         bottomSheet.setBackgroundColor(bottomSheetBg)
         chaptersButton.setColorFilter(overlayTextColor)
-        findViewById<ImageButton>(R.id.webview_button)?.setColorFilter(overlayTextColor)
-        highlightsButton.setColorFilter(overlayTextColor)
-        settingsButton.setColorFilter(overlayTextColor)
+        readingProgressText.setTextColor(overlayTextColor)
 
         // Update loading indicator theme when theme changes (Phase 0)
         binding.loadingIndicator.setInvertMode(isInvertedFromTheme())
@@ -394,25 +389,8 @@ class NovelReaderActivity : BaseActivity<NovelReaderActivityBinding>() {
             toggleBottomSheet()
         }
         
-        // Webview button - Open chapter in webview (like manga reader)
-        findViewById<ImageButton>(R.id.webview_button).setOnClickListener {
-            val chapter = viewModel.currentChapter.value ?: return@setOnClickListener
-            val intent = WebViewActivity.newIntent(
-                this,
-                chapter.url,
-                null,
-                chapter.title
-            )
-            startActivity(intent)
-        }
-        
-        highlightsButton.setOnClickListener {
-            showHighlightsDialog()
-        }
-        
-        settingsButton.setOnClickListener {
-            eu.kanade.tachiyomi.ui.novel.reader.settings.NovelReaderSettingsSheet(this).show()
-        }
+        // Reading progress text is updated via updateToolbarInfo / updateReadingProgress
+        // No additional click listeners needed for the progress display
         
         // REMOVED: Navigation button click listeners (buttons removed with nav_layout)
         // leftChapterButton.setOnClickListener {
@@ -1126,6 +1104,7 @@ class NovelReaderActivity : BaseActivity<NovelReaderActivityBinding>() {
         val chapter = currentChapter
         val chapterTitle = chapter?.let { NovelChapterAdapter.cleanChapterTitle(it.title) } ?: ""
         supportActionBar?.subtitle = "$chapterTitle  ·  $percent%"
+        updateReadingProgressText()
     }
     
     /**
@@ -1369,6 +1348,32 @@ class NovelReaderActivity : BaseActivity<NovelReaderActivityBinding>() {
             val percent = lastProgressPercent
             subtitle = if (percent >= 0) "$chapterTitle  ·  $percent%" else chapterTitle
         }
+        updateReadingProgressText()
+    }
+
+    private fun updateReadingProgressText() {
+        val chapter = currentChapter
+        val novel = this.novel
+        if (chapter != null && novel != null) {
+            lifecycleScope.launch {
+                try {
+                    val chapters = viewModel.chapters.value
+                    val totalChapters = chapters.size
+                    val currentIndex = chapters.indexOfFirst { it.id == chapter.id } + 1
+                    val chapterTitle = NovelChapterAdapter.cleanChapterTitle(chapter.title)
+                    val percent = lastProgressPercent.coerceIn(0, 100)
+                    readingProgressText.text = if (currentIndex > 0 && totalChapters > 0) {
+                        "$chapterTitle ($currentIndex / $totalChapters) · $percent%"
+                    } else {
+                        "$chapterTitle · $percent%"
+                    }
+                } catch (_: Exception) {
+                    readingProgressText.text = NovelChapterAdapter.cleanChapterTitle(chapter.title)
+                }
+            }
+        } else {
+            readingProgressText.text = ""
+        }
     }
 
     private var lastProgressPercent = -1
@@ -1444,19 +1449,6 @@ class NovelReaderActivity : BaseActivity<NovelReaderActivityBinding>() {
             android.R.id.home -> {
                 // Exit reader and return to novel details page
                 finish()
-                true
-            }
-            R.id.action_highlights -> {
-                startActivity(AllHighlightsActivity.newIntent(this))
-                true
-            }
-            R.id.action_reader_settings -> {
-                // TODO: Open reader settings
-                toast("Settings coming in Phase 5", Toast.LENGTH_SHORT)
-                true
-            }
-            R.id.action_share -> {
-                shareChapter()
                 true
             }
             R.id.action_open_epub -> {

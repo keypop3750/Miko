@@ -3,24 +3,6 @@
     xmlns:app="http://schemas.android.com/apk/res-auto">
 
     <item
-        android:id="@+id/action_highlights"
-        android:icon="@drawable/ic_bookmark_24dp"
-        android:title="Highlights"
-        app:showAsAction="ifRoom" />
-
-    <item
-        android:id="@+id/action_reader_settings"
-        android:icon="@drawable/ic_settings_24dp"
-        android:title="Settings"
-        app:showAsAction="ifRoom" />
-
-    <item
-        android:id="@+id/action_share"
-        android:icon="@drawable/ic_share_24dp"
-        android:title="Share"
-        app:showAsAction="ifRoom" />
-
-    <item
         android:id="@+id/action_open_epub"
         android:icon="@drawable/ic_file_download_24dp"
         android:title="Open EPUB"
