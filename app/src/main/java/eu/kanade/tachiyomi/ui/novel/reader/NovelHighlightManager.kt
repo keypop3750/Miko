@@ -224,7 +224,18 @@ class NovelHighlightManager(context: Context) {
     }
 
     private fun loadData(novelKey: NovelKey): NovelHighlightsData {
-        val file = File(highlightsDir, "${novelKey.fileName()}.json")
+        // Title-only filename (survives author edits)
+        val titleOnlyFile = File(highlightsDir, "${novelKey.titleFileName()}.json")
+        
+        // Backward compat: old files used title_author format
+        val legacyFile = File(highlightsDir, "${novelKey.legacyFileName()}.json")
+        
+        val file = when {
+            titleOnlyFile.exists() -> titleOnlyFile
+            legacyFile.exists() -> legacyFile
+            else -> titleOnlyFile
+        }
+        
         if (!file.exists()) return NovelHighlightsData(
             novelTitle = novelKey.title,
             author = novelKey.author,
@@ -244,7 +255,8 @@ class NovelHighlightManager(context: Context) {
     }
 
     private fun writeJson(novelKey: NovelKey, data: NovelHighlightsData) {
-        val file = File(highlightsDir, "${novelKey.fileName()}.json")
+        // Always write to title-only filename (migrates old files automatically)
+        val file = File(highlightsDir, "${novelKey.titleFileName()}.json")
         file.writeText(json.encodeToString(data))
     }
 
@@ -253,7 +265,7 @@ class NovelHighlightManager(context: Context) {
      * Each highlight is shown as a callout with a colored bar and optional note.
      */
     private fun exportToMd(novelKey: NovelKey, data: NovelHighlightsData) {
-        val file = File(highlightsDir, "${novelKey.fileName()}.md")
+        val file = File(highlightsDir, "${novelKey.titleFileName()}.md")
         val sb = StringBuilder()
         sb.appendLine("# ${data.novelTitle}")
         if (!data.author.isNullOrBlank()) sb.appendLine("**Author:** ${data.author}")
@@ -280,7 +292,8 @@ class NovelHighlightManager(context: Context) {
 
     /**
      * Key for identifying a novel across migrations.
-     * Uses title + author for matching (source/ID may change on migration).
+     * File name uses title only so author edits don't orphan highlights.
+     * Legacy title_author format is still supported for backward compatibility.
      */
     @Serializable
     data class NovelKey(
@@ -288,11 +301,20 @@ class NovelHighlightManager(context: Context) {
         val author: String? = null,
         val description: String? = null,
     ) {
-        fun fileName(): String {
-            val base = title.trim().replace(Regex("[^a-zA-Z0-9\\s-]"), "").replace(Regex("\\s+"), "_")
+        /** Title-only sanitized filename (new format) */
+        fun titleFileName(): String {
+            return title.trim().replace(Regex("[^a-zA-Z0-9\\s-]"), "").replace(Regex("\\s+"), "_")
+        }
+
+        /** Legacy title_author filename for backward compatibility */
+        fun legacyFileName(): String {
+            val base = titleFileName()
             val auth = author?.trim()?.replace(Regex("[^a-zA-Z0-9\\s-]"), "")?.replace(Regex("\\s+"), "_")
             return if (auth.isNullOrBlank()) base else "${base}_$auth"
         }
+
+        /** Kept for any external callers that expect the old behavior */
+        fun fileName(): String = titleFileName()
     }
 
     @Serializable

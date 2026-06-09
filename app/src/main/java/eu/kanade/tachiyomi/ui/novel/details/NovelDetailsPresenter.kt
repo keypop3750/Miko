@@ -542,31 +542,17 @@ class NovelDetailsPresenter(
                 // STEP 3: Initialize NovelChapterSort with the correct novel
                 novelChapterSort = NovelChapterSort(actualNovel, novelChapterFilter, preferences)
                 
-                // STEP 4: Auto-fetch from source if not initialized
+                // STEP 4: Auto-fetch from source only if not initialized (brand new novel from browse)
+                // DO NOT auto-refresh initialized novels - user may have edited metadata
                 if (!actualNovel.initialized) {
                     logger.i { "Novel not initialized, launching background fetch for novel ID ${actualNovel.id}, source ID ${actualNovel.source}" }
                     presenterScope.launchIO {
                         logger.i { "Background fetch coroutine started" }
                         try {
                             refreshNovelFromSource()
-                            // After refresh, the novel will be inserted with a new ID
-                            // The subscriptions below will automatically pick it up via _novel flow
                             logger.i { "Background fetch coroutine completed successfully" }
                         } catch (e: Exception) {
                             logger.e(e) { "Background fetch coroutine failed" }
-                        }
-                    }
-                } else if (_chapters.value.isEmpty()) {
-                    logger.i { "Novel has no chapters, launching background refresh from source" }
-                    presenterScope.launchIO {
-                        logger.i { "Background refresh coroutine started" }
-                        try {
-                            // Always refresh from source first to ensure novel is in DB
-                            // before fetching chapters (avoids FOREIGN KEY constraint errors)
-                            refreshNovelFromSource()
-                            logger.i { "Background refresh coroutine completed successfully" }
-                        } catch (e: Exception) {
-                            logger.e(e) { "Background refresh coroutine failed" }
                         }
                     }
                 }
@@ -787,19 +773,24 @@ class NovelDetailsPresenter(
             
             // Now update using the correct novel ID from _novel.value
             val novelToUpdate = _novel.value!!
+            
+            // Preserve user-edited metadata for novels already in the library.
+            // Only overwrite fields that the source legitimately updates (poster, genres)
+            // and fields that were genuinely empty/missing.
+            val isLibraryNovel = novelToUpdate.isFavorite
             val update = NovelUpdate(
-                id = novelToUpdate.id,  // Use the correct database ID
-                title = networkNovel.title,
-                author = networkNovel.author,
-                description = networkNovel.description,
+                id = novelToUpdate.id,
+                title = if (isLibraryNovel && !novelToUpdate.title.isNullOrBlank()) null else networkNovel.title,
+                author = if (isLibraryNovel && !novelToUpdate.author.isNullOrBlank()) null else networkNovel.author,
+                description = if (isLibraryNovel && !novelToUpdate.description.isNullOrBlank()) null else networkNovel.description,
                 posterUrl = networkNovel.posterUrl,
-                status = networkNovel.status.toInt(),
+                status = if (isLibraryNovel && novelToUpdate.status != 0) null else networkNovel.status.toInt(),
                 genres = networkNovel.genres,
-                initialized = true  // Mark as initialized after fetching from source
+                initialized = true
             )
             
             val updateSuccess = updateNovel.await(update)
-            logger.i { "Update result: $updateSuccess" }
+            logger.i { "Update result: $updateSuccess (library=$isLibraryNovel, preserved edits)" }
             
             // Insert chapters (FK constraint will now be satisfied)
             fetchChaptersFromSource()
