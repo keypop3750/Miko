@@ -66,54 +66,54 @@
             app:layout_constraintEnd_toEndOf="parent"
             tools:text="12" />
 
-        <!-- Novel title -->
+        <!-- Status (top of text stack) -->
         <TextView
-            android:id="@+id/novel_title"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_marginHorizontal="16dp"
-            android:layout_marginBottom="4dp"
-            android:ellipsize="end"
-            android:maxLines="1"
-            android:textColor="@android:color/white"
-            android:textSize="18sp"
-            android:textStyle="bold"
-            app:layout_constraintBottom_toTopOf="@id/novel_author"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintEnd_toEndOf="parent"
-            tools:text="Shadow Slave" />
-
-        <!-- Author -->
-        <TextView
-            android:id="@+id/novel_author"
+            android:id="@+id/novel_status"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_marginHorizontal="16dp"
             android:layout_marginBottom="2dp"
             android:ellipsize="end"
             android:maxLines="1"
+            android:textColor="#80FFFFFF"
+            android:textSize="11sp"
+            app:layout_constraintBottom_toTopOf="@id/novel_author"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            tools:text="Ongoing" />
+
+        <!-- Author (middle of text stack) -->
+        <TextView
+            android:id="@+id/novel_author"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginHorizontal="16dp"
+            android:layout_marginBottom="4dp"
+            android:ellipsize="end"
+            android:maxLines="1"
             android:textColor="#B3FFFFFF"
             android:textSize="13sp"
-            app:layout_constraintBottom_toTopOf="@id/novel_status"
+            app:layout_constraintBottom_toTopOf="@id/novel_title"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintEnd_toEndOf="parent"
             tools:text="Guiltythree" />
 
-        <!-- Status: highlight count / chapters / last date -->
+        <!-- Novel title (bottom, largest, on the darkest part of gradient) -->
         <TextView
-            android:id="@+id/novel_status"
+            android:id="@+id/novel_title"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_marginHorizontal="16dp"
             android:layout_marginBottom="12dp"
             android:ellipsize="end"
             android:maxLines="1"
-            android:textColor="#80FFFFFF"
-            android:textSize="11sp"
+            android:textColor="@android:color/white"
+            android:textSize="18sp"
+            android:textStyle="bold"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintEnd_toEndOf="parent"
-            tools:text="12 highlights across 3 chapters" />
+            tools:text="Shadow Slave" />
 
     </androidx.constraintlayout.widget.ConstraintLayout>
 

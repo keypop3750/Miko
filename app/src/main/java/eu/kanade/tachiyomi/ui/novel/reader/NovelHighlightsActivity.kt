@@ -22,7 +22,9 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.appbar.MaterialToolbar
 import eu.kanade.tachiyomi.R
+import eu.kanade.tachiyomi.data.preference.PreferencesHelper
 import eu.kanade.tachiyomi.databinding.NovelHighlightsActivityBinding
+import eu.kanade.tachiyomi.util.system.ThemeUtil
 import coil3.imageLoader
 import coil3.request.ImageRequest
 import coil3.request.target
@@ -52,6 +54,7 @@ class NovelHighlightsActivity : AppCompatActivity() {
     private var posterUrl: String? = null
     private var vibrantColor: Int? = null
 
+    private val preferences: PreferencesHelper by injectLazy()
     private val novelRepository: NovelRepository by injectLazy()
 
     companion object {
@@ -75,14 +78,17 @@ class NovelHighlightsActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Use the app theme background (appearance settings), not the reader background
-        val themeBg = getResourceColor(R.attr.background)
+        // Use the novel reader background for the immersive cover-art backdrop experience
+        val readerBg = ThemeUtil.readerBackgroundColor(
+            preferences.readerTheme().get(),
+            getResourceColor(R.attr.background)
+        )
 
         binding = NovelHighlightsActivityBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        // Apply theme background to the coordinator
-        binding.coordinator.setBackgroundColor(themeBg)
+        // Apply reader background to the coordinator
+        binding.coordinator.setBackgroundColor(readerBg)
 
         novelTitle = intent.getStringExtra(EXTRA_NOVEL_TITLE) ?: ""
         novelAuthor = intent.getStringExtra(EXTRA_NOVEL_AUTHOR)
@@ -135,9 +141,12 @@ class NovelHighlightsActivity : AppCompatActivity() {
         // Keep toolbar transparent over the blurred backdrop
         toolbar.setBackgroundColor(Color.TRANSPARENT)
 
-        // Tint toolbar text and nav icon to match theme background
-        val themeBg = getResourceColor(R.attr.background)
-        val isLightBg = themeBg == Color.WHITE || ColorUtils.calculateLuminance(themeBg) > 0.5
+        // Tint toolbar text and nav icon to match reader theme
+        val readerBg = ThemeUtil.readerBackgroundColor(
+            preferences.readerTheme().get(),
+            getResourceColor(R.attr.background)
+        )
+        val isLightBg = readerBg == Color.WHITE || ColorUtils.calculateLuminance(readerBg) > 0.5
         val textColor = if (isLightBg) Color.BLACK else Color.WHITE
         toolbar.setTitleTextColor(textColor)
         toolbar.navigationIcon?.setTint(textColor)
@@ -147,8 +156,8 @@ class NovelHighlightsActivity : AppCompatActivity() {
             window?.statusBarColor = Color.parseColor("#66000000")
         }
 
-        // Apply theme background to RecyclerView so the whole page is themed
-        binding.recyclerView.setBackgroundColor(themeBg)
+        // Apply reader background to RecyclerView so the whole page is themed
+        binding.recyclerView.setBackgroundColor(readerBg)
         binding.emptyView.setTextColor(textColor)
     }
 
@@ -158,8 +167,11 @@ class NovelHighlightsActivity : AppCompatActivity() {
         val trueBackdrop: View = binding.trueBackdrop
 
         // Detect light background for contrast adjustments
-        val themeBg = getResourceColor(R.attr.background)
-        val isLightBg = themeBg == Color.WHITE || ColorUtils.calculateLuminance(themeBg) > 0.7
+        val readerBg = ThemeUtil.readerBackgroundColor(
+            preferences.readerTheme().get(),
+            getResourceColor(R.attr.background)
+        )
+        val isLightBg = readerBg == Color.WHITE || ColorUtils.calculateLuminance(readerBg) > 0.7
 
         posterUrl?.let { url ->
             backdrop.isVisible = true
@@ -200,7 +212,7 @@ class NovelHighlightsActivity : AppCompatActivity() {
 
         // Build a very gradual full-screen gradient so the background "seeps"
         // softly into the blurred image with no hard line anywhere.
-        val bgColor = themeBg
+        val bgColor = readerBg
             ?: (binding.coordinator.background as? android.graphics.drawable.ColorDrawable)?.color
             ?: Color.WHITE
         // Use bgColor@0-alpha instead of Color.TRANSPARENT so the RGB channel

@@ -21,6 +21,7 @@ import coil3.request.target
 import eu.kanade.tachiyomi.R
 import eu.kanade.tachiyomi.data.preference.PreferencesHelper
 import eu.kanade.tachiyomi.databinding.ActivityAllHighlightsBinding
+import eu.kanade.tachiyomi.util.system.ThemeUtil
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -52,19 +53,28 @@ class AllHighlightsActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Use the app theme background (appearance settings), not the reader background
-        val themeBg = getResourceColor(R.attr.background)
+        // Use the novel reader theme background
+        val readerBg = ThemeUtil.readerBackgroundColor(
+            preferences.readerTheme().get(),
+            getResourceColor(R.attr.background)
+        )
         setTheme(android.R.style.Theme_Material_NoActionBar)
 
         binding = ActivityAllHighlightsBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        // Apply theme background
-        binding.root.setBackgroundColor(themeBg)
-        binding.recyclerView.setBackgroundColor(themeBg)
+        // Apply reader background
+        binding.root.setBackgroundColor(readerBg)
+        binding.recyclerView.setBackgroundColor(readerBg)
 
         setupToolbar()
         setupRecyclerView()
+        loadNovels()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // Refresh so edited author/status from detail screen is reflected
         loadNovels()
     }
 
@@ -80,13 +90,16 @@ class AllHighlightsActivity : AppCompatActivity() {
         supportActionBar?.setDisplayHomeAsUpEnabled(true)
         binding.toolbar.setNavigationOnClickListener { finish() }
 
-        // Tint toolbar to match theme background
-        val themeBg = getResourceColor(R.attr.background)
-        val isLightBg = themeBg == Color.WHITE || ColorUtils.calculateLuminance(themeBg) > 0.5
+        // Tint toolbar to match reader theme
+        val readerBg = ThemeUtil.readerBackgroundColor(
+            preferences.readerTheme().get(),
+            getResourceColor(R.attr.background)
+        )
+        val isLightBg = readerBg == Color.WHITE || ColorUtils.calculateLuminance(readerBg) > 0.5
         val textColor = if (isLightBg) Color.BLACK else Color.WHITE
         binding.toolbar.setTitleTextColor(textColor)
         binding.toolbar.navigationIcon?.setTint(textColor)
-        binding.toolbar.setBackgroundColor(ColorUtils.setAlphaComponent(themeBg, 230))
+        binding.toolbar.setBackgroundColor(ColorUtils.setAlphaComponent(readerBg, 230))
     }
 
     private fun setupRecyclerView() {
@@ -99,7 +112,10 @@ class AllHighlightsActivity : AppCompatActivity() {
                     novelAuthor = novel?.author ?: data.author,
                     posterUrl = novel?.posterUrl ?: data.posterUrl,
                     vibrantColor = novel?.vibrantCoverColor ?: data.vibrantCoverColor,
-                    readerBackgroundColor = getResourceColor(R.attr.background),
+                    readerBackgroundColor = ThemeUtil.readerBackgroundColor(
+                        preferences.readerTheme().get(),
+                        getResourceColor(R.attr.background)
+                    ),
                 )
             )
         }
