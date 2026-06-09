@@ -13,6 +13,7 @@ interface NovelRepository {
     suspend fun getFavoriteNovels(): Flow<List<Novel>>
     suspend fun getNovelById(id: Long): Novel?
     fun getNovelByIdAsFlow(id: Long): Flow<Novel?> // Reactive database access for details page
+    suspend fun getNovelByTitle(title: String): Novel?
     suspend fun getNovelByUrlAndSource(url: String, sourceId: Long): Novel?
     fun getNovelByUrlAndSourceAsFlow(url: String, sourceId: Long): Flow<Novel?> // Reactive access by URL
     suspend fun insertNovel(novel: Novel): Long

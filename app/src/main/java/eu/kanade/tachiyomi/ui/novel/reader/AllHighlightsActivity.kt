@@ -3,7 +3,6 @@ package eu.kanade.tachiyomi.ui.novel.reader
 import android.content.Context
 import android.content.Intent
 import android.graphics.Color
-import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
@@ -11,35 +10,39 @@ import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.content.ContextCompat
 import androidx.core.graphics.ColorUtils
 import androidx.core.view.isVisible
+import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import coil3.imageLoader
 import coil3.request.ImageRequest
-import coil3.request.placeholder
 import coil3.request.target
 import eu.kanade.tachiyomi.R
 import eu.kanade.tachiyomi.data.preference.PreferencesHelper
 import eu.kanade.tachiyomi.databinding.ActivityAllHighlightsBinding
 import eu.kanade.tachiyomi.util.system.ThemeUtil
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import uy.kohesive.injekt.injectLazy
+import yokai.domain.novel.Novel
+import yokai.domain.novel.NovelRepository
+import yokai.domain.novel.NovelStatus
 
 /**
  * Unified highlights page showing all novels that have saved highlights.
  * Each novel is displayed as a horizontal card with its cover art as background.
  *
  * Uses the novel reader theme so the background matches the user's novel reading preferences.
+ * Card metadata (author, status, cover) is fetched from the novel database for accuracy.
  */
 class AllHighlightsActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityAllHighlightsBinding
     private lateinit var adapter: NovelHighlightsAdapter
     private val preferences: PreferencesHelper by injectLazy()
+    private val novelRepository: NovelRepository by injectLazy()
 
     companion object {
         fun newIntent(context: Context): Intent {
@@ -94,15 +97,15 @@ class AllHighlightsActivity : AppCompatActivity() {
     }
 
     private fun setupRecyclerView() {
-        adapter = NovelHighlightsAdapter { novelData ->
-            // Open the per-novel highlights activity, passing saved color from JSON
+        adapter = NovelHighlightsAdapter { data, novel ->
+            // Open the per-novel highlights activity
             startActivity(
                 NovelHighlightsActivity.newIntent(
                     this,
-                    novelTitle = novelData.novelTitle,
-                    novelAuthor = novelData.author,
-                    posterUrl = novelData.posterUrl,
-                    vibrantColor = novelData.vibrantCoverColor,
+                    novelTitle = data.novelTitle,
+                    novelAuthor = novel?.author ?: data.author,
+                    posterUrl = novel?.posterUrl ?: data.posterUrl,
+                    vibrantColor = novel?.vibrantCoverColor ?: data.vibrantCoverColor,
                     readerBackgroundColor = ThemeUtil.readerBackgroundColor(
                         preferences.readerTheme().get(),
                         getResourceColor(R.attr.background)
@@ -115,22 +118,40 @@ class AllHighlightsActivity : AppCompatActivity() {
     }
 
     private fun loadNovels() {
-        val manager = NovelHighlightManager(this)
-        val novels = manager.getAllNovelsWithHighlights()
-        adapter.submitList(novels)
+        lifecycleScope.launch {
+            val manager = NovelHighlightManager(this@AllHighlightsActivity)
+            val highlightNovels = manager.getAllNovelsWithHighlights()
 
-        binding.emptyView.isVisible = novels.isEmpty()
-        binding.recyclerView.isVisible = novels.isNotEmpty()
+            // Look up each novel in the DB by title for accurate metadata
+            val enrichedList = withContext(Dispatchers.IO) {
+                highlightNovels.map { data ->
+                    val dbNovel = novelRepository.getNovelByTitle(data.novelTitle)
+                    HighlightItem(data, dbNovel)
+                }
+            }
+
+            adapter.submitList(enrichedList)
+
+            binding.emptyView.isVisible = enrichedList.isEmpty()
+            binding.recyclerView.isVisible = enrichedList.isNotEmpty()
+        }
     }
 
+    /**
+     * Combines highlight JSON data with the actual novel DB entry for accurate metadata.
+     */
+    data class HighlightItem(
+        val highlightData: NovelHighlightManager.NovelHighlightsData,
+        val dbNovel: Novel?,
+    )
+
     class NovelHighlightsAdapter(
-        private val onClick: (NovelHighlightManager.NovelHighlightsData) -> Unit,
+        private val onClick: (NovelHighlightManager.NovelHighlightsData, Novel?) -> Unit,
     ) : RecyclerView.Adapter<NovelHighlightsAdapter.CardViewHolder>() {
 
-        private var items: List<NovelHighlightManager.NovelHighlightsData> = emptyList()
-        private val dateFormat = SimpleDateFormat("MMM dd, yyyy", Locale.getDefault())
+        private var items: List<HighlightItem> = emptyList()
 
-        fun submitList(newItems: List<NovelHighlightManager.NovelHighlightsData>) {
+        fun submitList(newItems: List<HighlightItem>) {
             items = newItems
             notifyDataSetChanged()
         }
@@ -149,7 +170,7 @@ class AllHighlightsActivity : AppCompatActivity() {
 
         inner class CardViewHolder(
             view: View,
-            private val onClick: (NovelHighlightManager.NovelHighlightsData) -> Unit,
+            private val onClick: (NovelHighlightManager.NovelHighlightsData, Novel?) -> Unit,
         ) : RecyclerView.ViewHolder(view) {
             private val coverImage: ImageView = view.findViewById(R.id.cover_image)
             private val titleView: TextView = view.findViewById(R.id.novel_title)
@@ -157,50 +178,65 @@ class AllHighlightsActivity : AppCompatActivity() {
             private val countView: TextView = view.findViewById(R.id.highlight_count)
             private val statusView: TextView = view.findViewById(R.id.novel_status)
 
-            fun bind(data: NovelHighlightManager.NovelHighlightsData) {
+            fun bind(item: HighlightItem) {
+                val data = item.highlightData
+                val novel = item.dbNovel
+
                 titleView.text = data.novelTitle
-                authorView.text = data.author ?: "Unknown Author"
+
+                // Author from DB (most accurate), fallback to JSON
+                authorView.text = novel?.author ?: data.author ?: "Unknown Author"
                 authorView.isVisible = true
 
+                // Status from DB (Ongoing/Completed/etc.)
+                val statusText = novel?.let { resolveStatusText(it.status) }
+                if (statusText != null) {
+                    statusView.text = statusText
+                    statusView.isVisible = true
+                } else {
+                    statusView.isVisible = false
+                }
+
+                // Highlight count badge (top-right)
                 val totalHighlights = data.chapters.sumOf { it.highlights.size }
-                val chapterCount = data.chapters.size
                 countView.text = totalHighlights.toString()
 
-                // Status line: "X highlights across Y chapters | Last: date"
-                val lastHighlightDate = data.chapters
-                    .flatMap { it.highlights }
-                    .maxOfOrNull { it.timestamp }
-                    ?.let { dateFormat.format(Date(it)) }
-                statusView.text = buildString {
-                    append("$totalHighlights highlight${if (totalHighlights != 1) "s" else ""}")
-                    append(" across $chapterCount chapter${if (chapterCount != 1) "s" else ""}")
-                    if (lastHighlightDate != null) append(" | Last: $lastHighlightDate")
-                }
+                // Cover art: prioritize DB posterUrl, fallback to saved JSON posterUrl
+                val effectivePosterUrl = novel?.posterUrl ?: data.posterUrl
+                val effectiveVibrantColor = novel?.vibrantCoverColor ?: data.vibrantCoverColor
 
-                // Card background: use vibrantCoverColor as fallback when no poster
-                val vibrantColor = data.vibrantCoverColor
-                if (vibrantColor != null) {
+                // Set a fallback background color on the ImageView so it's not pure black
+                if (effectiveVibrantColor != null) {
                     val hsl = FloatArray(3)
-                    ColorUtils.colorToHSL(vibrantColor, hsl)
-                    hsl[2] = (hsl[2] * 0.5f).coerceIn(0.1f, 0.5f) // darken for readability
-                    val cardBg = ColorUtils.HSLToColor(hsl)
-                    coverImage.setBackgroundColor(cardBg)
+                    ColorUtils.colorToHSL(effectiveVibrantColor, hsl)
+                    hsl[2] = (hsl[2] * 0.5f).coerceIn(0.1f, 0.5f)
+                    coverImage.setBackgroundColor(ColorUtils.HSLToColor(hsl))
                 } else {
-                    coverImage.setBackgroundColor(Color.parseColor("#FF2D2D2D")) // default dark gray
+                    coverImage.setBackgroundColor(Color.parseColor("#FF2D2D2D"))
                 }
 
-                // Load cover with Coil (use vibrant color as placeholder)
+                // Load cover with Coil
                 coverImage.setImageDrawable(null)
-                if (data.posterUrl != null) {
+                if (!effectivePosterUrl.isNullOrBlank()) {
                     val request = ImageRequest.Builder(itemView.context)
-                        .data(data.posterUrl)
+                        .data(effectivePosterUrl)
                         .target(coverImage)
-                        .placeholder(android.R.drawable.ic_menu_gallery)
                         .build()
                     itemView.context.imageLoader.enqueue(request)
                 }
 
-                itemView.setOnClickListener { onClick(data) }
+                itemView.setOnClickListener { onClick(data, novel) }
+            }
+
+            private fun resolveStatusText(status: Int): String? {
+                return when (status) {
+                    NovelStatus.ONGOING -> "Ongoing"
+                    NovelStatus.COMPLETED -> "Completed"
+                    NovelStatus.PAUSED -> "On Hiatus"
+                    NovelStatus.DROPPED -> "Cancelled"
+                    NovelStatus.STUBBED -> "Stubbed"
+                    else -> null
+                }
             }
         }
     }

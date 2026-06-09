@@ -44,6 +44,12 @@ SELECT *
 FROM novels
 WHERE _id = :novelId;
 
+findNovelByTitle:
+SELECT *
+FROM novels
+WHERE title = :title
+LIMIT 1;
+
 findFavoriteNovels:
 SELECT *
 FROM novels

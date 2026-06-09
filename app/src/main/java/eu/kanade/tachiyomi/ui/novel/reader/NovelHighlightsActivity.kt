@@ -26,9 +26,14 @@ import eu.kanade.tachiyomi.databinding.NovelHighlightsActivityBinding
 import coil3.imageLoader
 import coil3.request.ImageRequest
 import coil3.request.target
+import eu.kanade.tachiyomi.data.preference.PreferencesHelper
+import eu.kanade.tachiyomi.util.system.ThemeUtil
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import kotlinx.coroutines.runBlocking
+import uy.kohesive.injekt.injectLazy
+import yokai.domain.novel.NovelRepository
 
 /**
  * Full-page activity for viewing all highlights of a novel.
@@ -48,6 +53,9 @@ class NovelHighlightsActivity : AppCompatActivity() {
     private var novelAuthor: String? = null
     private var posterUrl: String? = null
     private var vibrantColor: Int? = null
+
+    private val preferences: PreferencesHelper by injectLazy()
+    private val novelRepository: NovelRepository by injectLazy()
 
     companion object {
         private const val EXTRA_NOVEL_TITLE = "novel_title"
@@ -69,27 +77,43 @@ class NovelHighlightsActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // ALWAYS apply the novel reader theme background (not just when passed via intent)
+        val readerBg = ThemeUtil.readerBackgroundColor(
+            preferences.readerTheme().get(),
+            getResourceColor(R.attr.background)
+        )
+
         binding = NovelHighlightsActivityBinding.inflate(layoutInflater)
         setContentView(binding.root)
+
+        // Apply novel reader background to the coordinator
+        binding.coordinator.setBackgroundColor(readerBg)
 
         novelTitle = intent.getStringExtra(EXTRA_NOVEL_TITLE) ?: ""
         novelAuthor = intent.getStringExtra(EXTRA_NOVEL_AUTHOR)
         posterUrl = intent.getStringExtra(EXTRA_NOVEL_POSTER)
         vibrantColor = if (intent.hasExtra(EXTRA_NOVEL_COLOR)) intent.getIntExtra(EXTRA_NOVEL_COLOR, 0) else null
 
-        // Apply the same reader background color the novel reader uses
-        val readerBg = if (intent.hasExtra(EXTRA_READER_BG)) intent.getIntExtra(EXTRA_READER_BG, 0) else null
-        readerBg?.let { binding.coordinator.setBackgroundColor(it) }
-
         highlightManager = NovelHighlightManager(this)
 
-        // If vibrant color wasn't passed via intent, try to load it from saved highlights JSON
-        if (vibrantColor == null) {
+        // Look up novel from DB for accurate posterUrl and vibrantCoverColor
+        val dbNovel = runCatching {
+            kotlinx.coroutines.runBlocking {
+                novelRepository.getNovelByTitle(novelTitle)
+            }
+        }.getOrNull()
+
+        // Fallback to DB values if intent didn't provide them
+        if (posterUrl == null) posterUrl = dbNovel?.posterUrl
+        if (vibrantColor == null) vibrantColor = dbNovel?.vibrantCoverColor
+
+        // Also try loading from saved highlights JSON as last resort
+        if (vibrantColor == null || posterUrl == null) {
             val savedData = highlightManager.getAllHighlights(
                 NovelHighlightManager.NovelKey(title = novelTitle, author = novelAuthor)
             )
-            vibrantColor = savedData.vibrantCoverColor
-            // Also fill in missing posterUrl from saved data
+            if (vibrantColor == null) vibrantColor = savedData.vibrantCoverColor
             if (posterUrl == null) posterUrl = savedData.posterUrl
         }
 
@@ -97,6 +121,13 @@ class NovelHighlightsActivity : AppCompatActivity() {
         setupBackdrop()
         setupRecyclerView()
         loadHighlights()
+    }
+
+    private fun getResourceColor(attr: Int): Int {
+        val ta = theme.obtainStyledAttributes(intArrayOf(attr))
+        val color = ta.getColor(0, Color.WHITE)
+        ta.recycle()
+        return color
     }
 
     private fun setupToolbar() {
@@ -110,10 +141,24 @@ class NovelHighlightsActivity : AppCompatActivity() {
         // Keep toolbar transparent over the blurred backdrop
         toolbar.setBackgroundColor(Color.TRANSPARENT)
 
+        // Tint toolbar text and nav icon to match novel reader theme
+        val readerBg = ThemeUtil.readerBackgroundColor(
+            preferences.readerTheme().get(),
+            getResourceColor(R.attr.background)
+        )
+        val isLightBg = readerBg == Color.WHITE || ColorUtils.calculateLuminance(readerBg) > 0.5
+        val textColor = if (isLightBg) Color.BLACK else Color.WHITE
+        toolbar.setTitleTextColor(textColor)
+        toolbar.navigationIcon?.setTint(textColor)
+
         // Use translucent dark status bar instead of solid vibrant color
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             window?.statusBarColor = Color.parseColor("#66000000")
         }
+
+        // Apply reader background to RecyclerView so the whole page is themed
+        binding.recyclerView.setBackgroundColor(readerBg)
+        binding.emptyView.setTextColor(textColor)
     }
 
     private fun setupBackdrop() {
@@ -122,9 +167,11 @@ class NovelHighlightsActivity : AppCompatActivity() {
         val trueBackdrop: View = binding.trueBackdrop
 
         // Detect light background for contrast adjustments
-        val readerBg = if (intent.hasExtra(EXTRA_READER_BG)) intent.getIntExtra(EXTRA_READER_BG, 0) else null
-        val isLightBg = readerBg != null &&
-            (readerBg == Color.WHITE || ColorUtils.calculateLuminance(readerBg) > 0.7)
+        val readerBg = ThemeUtil.readerBackgroundColor(
+            preferences.readerTheme().get(),
+            getResourceColor(R.attr.background)
+        )
+        val isLightBg = readerBg == Color.WHITE || ColorUtils.calculateLuminance(readerBg) > 0.7
 
         posterUrl?.let { url ->
             backdrop.isVisible = true

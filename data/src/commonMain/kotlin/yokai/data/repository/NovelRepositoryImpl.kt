@@ -41,6 +41,12 @@ class NovelRepositoryImpl(
         }
     }
     
+    override suspend fun getNovelByTitle(title: String): Novel? {
+        return handler.awaitOneOrNull {
+            novelsQueries.findNovelByTitle(title, ::mapNovel)
+        }
+    }
+
     override suspend fun getNovelByUrlAndSource(url: String, sourceId: Long): Novel? {
         return handler.awaitOneOrNull {
             novelsQueries.findNovelByUrlAndSource(url, sourceId, ::mapNovel)
