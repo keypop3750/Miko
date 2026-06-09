@@ -24,6 +24,7 @@ import eu.kanade.tachiyomi.ui.base.activity.BaseThemedActivity
 import eu.kanade.tachiyomi.util.system.ThemeUtil
 import eu.kanade.tachiyomi.util.system.isDarkMode
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import uy.kohesive.injekt.injectLazy
@@ -82,6 +83,27 @@ class AllHighlightsActivity : BaseThemedActivity() {
         loadNovels()
     }
 
+    private suspend fun findNovelByTitleFuzzy(title: String): Novel? {
+        val trimmed = title.trim()
+        // Exact case-insensitive match
+        novelRepository.getNovelByTitle(trimmed)?.let { return it }
+
+        // Normalized whitespace
+        val normalized = trimmed.replace(Regex("\\s+"), " ")
+        if (normalized != trimmed) {
+            novelRepository.getNovelByTitle(normalized)?.let { return it }
+        }
+
+        // Fuzzy: search all novels for best match
+        return try {
+            val allNovels = novelRepository.getAllNovels().first()
+            val searchLower = normalized.lowercase()
+            allNovels.find { it.title.trim().lowercase() == searchLower }
+                ?: allNovels.find { it.title.trim().lowercase().contains(searchLower) }
+                ?: allNovels.find { searchLower.contains(it.title.trim().lowercase()) }
+        } catch (_: Exception) { null }
+    }
+
     private fun getResourceColor(attr: Int): Int {
         val ta = theme.obtainStyledAttributes(intArrayOf(attr))
         val color = ta.getColor(0, Color.WHITE)
@@ -135,7 +157,7 @@ class AllHighlightsActivity : BaseThemedActivity() {
             // Look up each novel in the DB by title for accurate metadata
             val enrichedList = withContext(Dispatchers.IO) {
                 highlightNovels.map { data ->
-                    val dbNovel = novelRepository.getNovelByTitle(data.novelTitle)
+                    val dbNovel = findNovelByTitleFuzzy(data.novelTitle)
                     HighlightItem(data, dbNovel)
                 }
             }

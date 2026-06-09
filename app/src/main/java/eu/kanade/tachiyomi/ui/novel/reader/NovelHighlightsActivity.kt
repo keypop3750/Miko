@@ -18,6 +18,7 @@ import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.content.ContextCompat
 import androidx.core.graphics.ColorUtils
 import androidx.core.view.isVisible
+import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.appbar.MaterialToolbar
@@ -26,13 +27,17 @@ import eu.kanade.tachiyomi.databinding.NovelHighlightsActivityBinding
 import eu.kanade.tachiyomi.ui.base.activity.BaseThemedActivity
 import eu.kanade.tachiyomi.util.system.ThemeUtil
 import eu.kanade.tachiyomi.util.system.isDarkMode
+import eu.kanade.tachiyomi.util.system.toast
 import coil3.imageLoader
 import coil3.request.ImageRequest
 import coil3.request.target
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 import uy.kohesive.injekt.injectLazy
 import yokai.domain.novel.NovelRepository
 
@@ -266,6 +271,12 @@ class NovelHighlightsActivity : BaseThemedActivity() {
                             onComplete = { loadHighlights() }
                         )
                     }
+                    is HighlightAction.Find -> {
+                        lifecycleScope.launch {
+                            val paragraphIndex = action.paragraphIndex
+                            navigateToHighlight(chapterNumber, paragraphIndex)
+                        }
+                    }
                     else -> { /* EditNote handled inline in adapter */ }
                 }
             },
@@ -309,6 +320,27 @@ class NovelHighlightsActivity : BaseThemedActivity() {
         return items
     }
 
+    private suspend fun navigateToHighlight(chapterNumber: Double, paragraphIndex: Int) {
+        withContext(Dispatchers.IO) {
+            val novel = novelRepository.getNovelByTitle(novelTitle)
+                ?: run {
+                    withContext(Dispatchers.Main) { toast("Novel not found in library", android.widget.Toast.LENGTH_SHORT) }
+                    return@withContext
+                }
+            val chapters = novelRepository.getChaptersByNovelIdOnce(novel.id)
+            val targetChapter = chapters.find { it.chapterNumber == chapterNumber }
+                ?: chapters.find { kotlin.math.abs(it.chapterNumber - chapterNumber) < 0.1 }
+                ?: run {
+                    withContext(Dispatchers.Main) { toast("Chapter not found", android.widget.Toast.LENGTH_SHORT) }
+                    return@withContext
+                }
+            withContext(Dispatchers.Main) {
+                val intent = NovelReaderActivity.newIntent(this@NovelHighlightsActivity, novel.id, targetChapter.id)
+                startActivity(intent)
+            }
+        }
+    }
+
     // --- Adapter ---
 
     sealed class HighlightListItem {
@@ -321,6 +353,7 @@ class NovelHighlightsActivity : BaseThemedActivity() {
         object Share : HighlightAction()
         object Delete : HighlightAction()
         object EditNote : HighlightAction()
+        data class Find(val paragraphIndex: Int) : HighlightAction()
     }
 
     class HighlightsAdapter(
@@ -373,10 +406,8 @@ class NovelHighlightsActivity : BaseThemedActivity() {
 
         class HeaderViewHolder(view: View, private val accentColor: Int) : RecyclerView.ViewHolder(view) {
             private val titleView: TextView = view.findViewById(R.id.chapter_header_title)
-            private val accentBar: View? = view.findViewById(R.id.chapter_header_accent_bar)
             fun bind(title: String) {
                 titleView.text = title
-                accentBar?.setBackgroundColor(accentColor)
             }
         }
 
@@ -449,17 +480,12 @@ class NovelHighlightsActivity : BaseThemedActivity() {
                     }
                 }
 
-                // Long-press or tap on note to edit
+                // Tap on note to show note dialog (Find / Edit / Delete)
                 noteView.setOnClickListener {
-                    noteView.isVisible = false
-                    noteInput.isVisible = true
-                    noteInput.setText(entry.note ?: "")
-                    noteInput.requestFocus()
-                    val imm = itemView.context.getSystemService(android.content.Context.INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager
-                    imm.showSoftInput(noteInput, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT)
+                    showNoteDialog(entry, chapterNumber)
                 }
 
-                // Tap for actions (copy, share, delete) on the card body
+                // Tap for actions (copy, share, delete, find) on the card body
                 itemView.setOnClickListener {
                     showActions(entry, chapterNumber)
                 }
@@ -473,9 +499,33 @@ class NovelHighlightsActivity : BaseThemedActivity() {
                 onNoteChanged(entry, chapterNumber, note)
             }
 
+            private fun showNoteDialog(entry: NovelHighlightManager.HighlightEntry, chapterNumber: Double) {
+                val noteText = entry.note ?: ""
+                val options = arrayOf("Find in chapter", "Edit note", "Delete highlight", "Close")
+                com.google.android.material.dialog.MaterialAlertDialogBuilder(itemView.context)
+                    .setTitle("Note")
+                    .setMessage(noteText)
+                    .setItems(options) { _, which ->
+                        when (which) {
+                            0 -> onAction(HighlightAction.Find(entry.paragraphIndex), entry, chapterNumber)
+                            1 -> {
+                                noteView.isVisible = false
+                                noteInput.isVisible = true
+                                noteInput.setText(noteText)
+                                noteInput.requestFocus()
+                                val imm = itemView.context.getSystemService(android.content.Context.INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager
+                                imm.showSoftInput(noteInput, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT)
+                            }
+                            2 -> onAction(HighlightAction.Delete, entry, chapterNumber)
+                            3 -> { /* Close: dismiss handled automatically */ }
+                        }
+                    }
+                    .show()
+            }
+
             private fun showActions(entry: NovelHighlightManager.HighlightEntry, chapterNumber: Double) {
                 val options = arrayOf("Copy text", "Share", "Delete")
-                androidx.appcompat.app.AlertDialog.Builder(itemView.context)
+                com.google.android.material.dialog.MaterialAlertDialogBuilder(itemView.context)
                     .setTitle("Highlight")
                     .setItems(options) { _, which ->
                         when (which) {
