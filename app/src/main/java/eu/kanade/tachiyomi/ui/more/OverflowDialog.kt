@@ -19,6 +19,7 @@ import eu.kanade.tachiyomi.core.preference.toggle
 import eu.kanade.tachiyomi.data.preference.PreferencesHelper
 import eu.kanade.tachiyomi.databinding.TachiOverflowLayoutBinding
 import eu.kanade.tachiyomi.ui.main.MainActivity
+import eu.kanade.tachiyomi.ui.novel.reader.AllHighlightsActivity
 import eu.kanade.tachiyomi.util.lang.addBetaTag
 import eu.kanade.tachiyomi.util.lang.withSubtitle
 import eu.kanade.tachiyomi.util.system.dpToPx
@@ -88,6 +89,11 @@ class OverflowDialog(activity: MainActivity) : Dialog(activity, R.style.Overflow
                 (getIcon() as? AnimatedVectorDrawableCompat)?.start()
             }
         }
+        binding.highlightsItem.setOnClickListener {
+            activity.startActivity(AllHighlightsActivity.newIntent(activity))
+            dismiss()
+        }
+
         binding.settingsItem.setOnClickListener {
             activity.showSettings()
             dismiss()

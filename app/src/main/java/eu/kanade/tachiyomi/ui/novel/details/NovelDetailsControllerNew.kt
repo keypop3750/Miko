@@ -47,6 +47,7 @@ import eu.kanade.tachiyomi.databinding.NovelDetailsHeaderSimpleBinding
 import eu.kanade.tachiyomi.ui.base.MaterialMenuSheet
 import eu.kanade.tachiyomi.ui.base.controller.BaseCoroutineController
 import eu.kanade.tachiyomi.ui.novel.chapter.NovelChaptersSortBottomSheet
+import eu.kanade.tachiyomi.ui.novel.reader.NovelHighlightsActivity
 import eu.kanade.tachiyomi.ui.novel.reader.NovelReaderActivity
 import eu.kanade.tachiyomi.util.system.dpToPx
 import eu.kanade.tachiyomi.util.system.getResourceColor
@@ -813,6 +814,18 @@ class NovelDetailsControllerNew : BaseCoroutineController<NovelDetailsController
 
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         when (item.itemId) {
+            R.id.action_highlights -> {
+                val novel = presenter.novelValue ?: return true
+                startActivity(
+                    NovelHighlightsActivity.newIntent(
+                        activity!!,
+                        novelTitle = novel.title,
+                        novelAuthor = novel.author,
+                        posterUrl = novel.posterUrl,
+                    )
+                )
+                return true
+            }
             R.id.action_edit -> {
                 showEditDialog()
                 return true

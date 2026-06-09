@@ -70,6 +70,12 @@
         </menu>
     </item>
     <item
+        android:id="@+id/action_highlights"
+        android:icon="@drawable/ic_bookmark_24dp"
+        android:title="Highlights"
+        app:showAsAction="never" />
+
+    <item
         android:id="@+id/action_edit"
         android:icon="@drawable/ic_edit_24dp"
         android:title="@string/edit"

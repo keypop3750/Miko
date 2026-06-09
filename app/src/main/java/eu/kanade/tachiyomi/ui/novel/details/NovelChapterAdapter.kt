@@ -92,6 +92,11 @@ class NovelChapterAdapter(
         if (holder is ChapterViewHolder) {
             val chapterPosition = if (headerView != null) position - 1 else position
             holder.bind(chapters[chapterPosition])
+            // Reset swipe state to prevent background views from getting stuck
+            // when notifyItemChange races with ItemTouchHelper's clearView
+            holder.binding.startView.isVisible = false
+            holder.binding.endView.isVisible = false
+            holder.binding.frontView.translationX = 0f
         }
     }
 
