@@ -150,6 +150,51 @@ class NovelHighlightManager(context: Context) {
     }
 
     /**
+     * Update novel-level metadata (title, author, status, posterUrl) stored in the JSON.
+     * This only affects the highlight card display, not the DB novel entry.
+     * Calls [onComplete] on the main thread after the file is written.
+     */
+    fun updateNovelMetadata(
+        novelKey: NovelKey,
+        title: String? = null,
+        author: String? = null,
+        status: Int? = null,
+        posterUrl: String? = null,
+        vibrantCoverColor: Int? = null,
+        onComplete: (() -> Unit)? = null,
+    ) {
+        kotlinx.coroutines.GlobalScope.launch(Dispatchers.IO) {
+            val data = loadData(novelKey)
+            val updatedData = data.copy(
+                novelTitle = title ?: data.novelTitle,
+                author = author ?: data.author,
+                status = status ?: data.status,
+                posterUrl = posterUrl ?: data.posterUrl,
+                vibrantCoverColor = vibrantCoverColor ?: data.vibrantCoverColor,
+            )
+            writeJson(novelKey, updatedData)
+            exportToMd(novelKey, updatedData)
+            withContext(Dispatchers.Main) { onComplete?.invoke() }
+        }
+    }
+
+    /**
+     * Delete all highlights for a novel (removes the JSON and MD files).
+     * Calls [onComplete] on the main thread after deletion.
+     */
+    fun deleteAllHighlights(novelKey: NovelKey, onComplete: (() -> Unit)? = null) {
+        kotlinx.coroutines.GlobalScope.launch(Dispatchers.IO) {
+            val titleFile = File(highlightsDir, "${novelKey.titleFileName()}.json")
+            val legacyFile = File(highlightsDir, "${novelKey.legacyFileName()}.json")
+            val mdFile = File(highlightsDir, "${novelKey.titleFileName()}.md")
+            titleFile.delete()
+            legacyFile.delete()
+            mdFile.delete()
+            withContext(Dispatchers.Main) { onComplete?.invoke() }
+        }
+    }
+
+    /**
      * Get all highlights for a specific chapter.
      */
     fun getChapterHighlights(novelKey: NovelKey, chapterNumber: Double): List<HighlightEntry> {
@@ -340,6 +385,7 @@ class NovelHighlightManager(context: Context) {
         val posterUrl: String? = null,
         val vibrantCoverColor: Int? = null,
         val novelId: Long? = null,
+        val status: Int? = null,
         val chapters: List<ChapterHighlights> = emptyList(),
     )
 

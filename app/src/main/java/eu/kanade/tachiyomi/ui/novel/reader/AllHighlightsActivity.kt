@@ -7,6 +7,8 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.EditText
+import android.widget.ImageButton
 import android.widget.ImageView
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatDelegate
@@ -138,22 +140,26 @@ class AllHighlightsActivity : BaseThemedActivity() {
     }
 
     private fun setupRecyclerView() {
-        adapter = NovelHighlightsAdapter { data, novel ->
-            // Open the per-novel highlights activity
-            startActivity(
-                NovelHighlightsActivity.newIntent(
-                    this,
-                    novelTitle = data.novelTitle,
-                    novelAuthor = novel?.author ?: data.author,
-                    posterUrl = novel?.posterUrl ?: data.posterUrl,
-                    vibrantColor = novel?.vibrantCoverColor ?: data.vibrantCoverColor,
-                    readerBackgroundColor = ThemeUtil.readerBackgroundColor(
-                        preferences.readerTheme().get(),
-                        getResourceColor(R.attr.background)
-                    ),
+        adapter = NovelHighlightsAdapter(
+            onClick = { data, novel ->
+                startActivity(
+                    NovelHighlightsActivity.newIntent(
+                        this,
+                        novelTitle = data.novelTitle,
+                        novelAuthor = data.author ?: novel?.author,
+                        posterUrl = data.posterUrl ?: novel?.posterUrl,
+                        vibrantColor = data.vibrantCoverColor ?: novel?.vibrantCoverColor,
+                        readerBackgroundColor = ThemeUtil.readerBackgroundColor(
+                            preferences.readerTheme().get(),
+                            getResourceColor(R.attr.background)
+                        ),
+                    )
                 )
-            )
-        }
+            },
+            onMoreClick = { item, position ->
+                showOptionsDialog(item, position)
+            },
+        )
         binding.recyclerView.layoutManager = LinearLayoutManager(this)
         binding.recyclerView.adapter = adapter
     }
@@ -188,6 +194,7 @@ class AllHighlightsActivity : BaseThemedActivity() {
 
     class NovelHighlightsAdapter(
         private val onClick: (NovelHighlightManager.NovelHighlightsData, Novel?) -> Unit,
+        private val onMoreClick: (HighlightItem, Int) -> Unit,
     ) : RecyclerView.Adapter<NovelHighlightsAdapter.CardViewHolder>() {
 
         private var items: List<HighlightItem> = emptyList()
@@ -202,7 +209,7 @@ class AllHighlightsActivity : BaseThemedActivity() {
         override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): CardViewHolder {
             val view = LayoutInflater.from(parent.context)
                 .inflate(R.layout.item_highlight_novel_card, parent, false)
-            return CardViewHolder(view, onClick)
+            return CardViewHolder(view, onClick, onMoreClick)
         }
 
         override fun onBindViewHolder(holder: CardViewHolder, position: Int) {
@@ -212,37 +219,41 @@ class AllHighlightsActivity : BaseThemedActivity() {
         inner class CardViewHolder(
             view: View,
             private val onClick: (NovelHighlightManager.NovelHighlightsData, Novel?) -> Unit,
+            private val onMoreClick: (HighlightItem, Int) -> Unit,
         ) : RecyclerView.ViewHolder(view) {
             private val coverImage: ImageView = view.findViewById(R.id.cover_image)
             private val titleView: TextView = view.findViewById(R.id.novel_title)
             private val authorView: TextView = view.findViewById(R.id.novel_author)
             private val countView: TextView = view.findViewById(R.id.highlight_count)
             private val statusView: TextView = view.findViewById(R.id.novel_status)
+            private val moreButton: ImageButton = view.findViewById(R.id.more_button)
 
             fun bind(item: HighlightItem) {
                 val data = item.highlightData
                 val novel = item.dbNovel
 
+                // Title from JSON (user-editable)
                 titleView.text = data.novelTitle
 
-                // Author from DB (most accurate), fallback to JSON
-                authorView.text = novel?.author ?: data.author ?: "Unknown Author"
+                // Author from JSON (user-editable), fallback to DB, then Unknown
+                authorView.text = data.author ?: novel?.author ?: "Unknown"
                 authorView.isVisible = true
 
-                // Status from DB (Ongoing/Completed/etc.), fallback to Unknown
-                val statusText = novel?.let { resolveStatusText(it.status) } ?: "Unknown"
+                // Status from JSON (user-editable), fallback to DB, then Unknown
+                val statusText = data.status?.let { resolveStatusText(it) }
+                    ?: novel?.let { resolveStatusText(it.status) }
+                    ?: "Unknown"
                 statusView.text = statusText
                 statusView.isVisible = true
 
-                // Highlight count badge (top-right)
+                // Highlight count badge (bottom-right)
                 val totalHighlights = data.chapters.sumOf { it.highlights.size }
                 countView.text = totalHighlights.toString()
 
-                // Cover art: prioritize DB posterUrl, fallback to saved JSON posterUrl
-                val effectivePosterUrl = novel?.posterUrl ?: data.posterUrl
-                val effectiveVibrantColor = novel?.vibrantCoverColor ?: data.vibrantCoverColor
+                // Cover art: prioritize JSON posterUrl (user-editable), fallback to DB
+                val effectivePosterUrl = data.posterUrl ?: novel?.posterUrl
+                val effectiveVibrantColor = data.vibrantCoverColor ?: novel?.vibrantCoverColor
 
-                // Set a fallback background color on the ImageView so it's not pure black
                 if (effectiveVibrantColor != null) {
                     val hsl = FloatArray(3)
                     ColorUtils.colorToHSL(effectiveVibrantColor, hsl)
@@ -252,7 +263,6 @@ class AllHighlightsActivity : BaseThemedActivity() {
                     coverImage.setBackgroundColor(Color.parseColor("#FF2D2D2D"))
                 }
 
-                // Load cover with Coil
                 coverImage.setImageDrawable(null)
                 if (!effectivePosterUrl.isNullOrBlank()) {
                     val request = ImageRequest.Builder(itemView.context)
@@ -263,6 +273,7 @@ class AllHighlightsActivity : BaseThemedActivity() {
                 }
 
                 itemView.setOnClickListener { onClick(data, novel) }
+                moreButton.setOnClickListener { onMoreClick(item, bindingAdapterPosition) }
             }
 
             private fun resolveStatusText(status: Int): String {
@@ -276,5 +287,116 @@ class AllHighlightsActivity : BaseThemedActivity() {
                 }
             }
         }
+    }
+
+    // ------------------------------------------------------------------
+    // Options dialog (Edit / Delete)
+    // ------------------------------------------------------------------
+    private fun showOptionsDialog(item: HighlightItem, position: Int) {
+        val options = arrayOf("Edit", "Delete")
+        androidx.appcompat.app.AlertDialog.Builder(this)
+            .setTitle(item.highlightData.novelTitle)
+            .setItems(options) { _, which ->
+                when (which) {
+                    0 -> showEditDialog(item, position)
+                    1 -> showDeleteConfirmationDialog(item, position)
+                }
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    // ------------------------------------------------------------------
+    // Edit dialog
+    // ------------------------------------------------------------------
+    private fun showEditDialog(item: HighlightItem, position: Int) {
+        val data = item.highlightData
+        val novel = item.dbNovel
+
+        val dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_edit_highlight_novel, null)
+        val coverImage = dialogView.findViewById<ImageView>(R.id.novel_cover)
+        val titleInput = dialogView.findViewById<EditText>(R.id.title)
+        val authorInput = dialogView.findViewById<EditText>(R.id.novel_author)
+        val statusSpinner = dialogView.findViewById<eu.kanade.tachiyomi.widget.MaterialSpinnerView>(R.id.novel_status)
+        val posterUrlInput = dialogView.findViewById<EditText>(R.id.poster_url)
+        val resetCoverBtn = dialogView.findViewById<com.google.android.material.button.MaterialButton>(R.id.reset_cover)
+
+        // Load current cover
+        val currentPosterUrl = data.posterUrl ?: novel?.posterUrl
+        coverImage.setImageDrawable(null)
+        if (!currentPosterUrl.isNullOrBlank()) {
+            val request = ImageRequest.Builder(this)
+                .data(currentPosterUrl)
+                .target(coverImage)
+                .build()
+            imageLoader.enqueue(request)
+        } else {
+            coverImage.setImageResource(R.mipmap.ic_launcher)
+        }
+
+        // Pre-fill fields
+        titleInput.setText(data.novelTitle)
+        authorInput.setText(data.author ?: novel?.author ?: "")
+        posterUrlInput.setText(data.posterUrl ?: novel?.posterUrl ?: "")
+
+        // Status: prefer JSON, fallback to DB, default to Unknown (0)
+        val currentStatus = data.status ?: novel?.status ?: 0
+        statusSpinner.setSelection(currentStatus.coerceIn(0, 5))
+
+        // Reset cover clears the poster URL input
+        resetCoverBtn.setOnClickListener {
+            posterUrlInput.setText("")
+            coverImage.setImageResource(R.mipmap.ic_launcher)
+        }
+
+        androidx.appcompat.app.AlertDialog.Builder(this)
+            .setTitle("Edit Novel Info")
+            .setView(dialogView)
+            .setPositiveButton("Save") { _, _ ->
+                val manager = NovelHighlightManager(this)
+                val novelKey = NovelHighlightManager.NovelKey(
+                    title = data.novelTitle,
+                    author = data.author,
+                    novelId = data.novelId,
+                )
+                val newTitle = titleInput.text.toString().trim()
+                val newAuthor = authorInput.text.toString().trim().takeIf { it.isNotBlank() }
+                val newPosterUrl = posterUrlInput.text.toString().trim().takeIf { it.isNotBlank() }
+                val newStatus = statusSpinner.selectedPosition.coerceIn(0, 5)
+
+                manager.updateNovelMetadata(
+                    novelKey = novelKey,
+                    title = newTitle.takeIf { it.isNotBlank() },
+                    author = newAuthor,
+                    status = newStatus,
+                    posterUrl = newPosterUrl,
+                    onComplete = { loadNovels() }
+                )
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    // ------------------------------------------------------------------
+    // Delete confirmation
+    // ------------------------------------------------------------------
+    private fun showDeleteConfirmationDialog(item: HighlightItem, position: Int) {
+        val data = item.highlightData
+        androidx.appcompat.app.AlertDialog.Builder(this)
+            .setTitle("Delete all highlights?")
+            .setMessage("This will permanently remove all highlights for \"${data.novelTitle}\".")
+            .setPositiveButton("Delete") { _, _ ->
+                val manager = NovelHighlightManager(this)
+                val novelKey = NovelHighlightManager.NovelKey(
+                    title = data.novelTitle,
+                    author = data.author,
+                    novelId = data.novelId,
+                )
+                manager.deleteAllHighlights(novelKey) {
+                    loadNovels()
+                }
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
     }
 }
