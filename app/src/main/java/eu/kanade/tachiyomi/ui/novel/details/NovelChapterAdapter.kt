@@ -4,12 +4,17 @@ import android.content.res.ColorStateList
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import androidx.appcompat.widget.PopupMenu
 import androidx.core.view.isVisible
 import androidx.recyclerview.widget.ItemTouchHelper
 import androidx.recyclerview.widget.RecyclerView
 import eu.kanade.tachiyomi.R
+import eu.kanade.tachiyomi.data.download.novel.DownloadState
 import eu.kanade.tachiyomi.databinding.NovelChaptersItemBinding
+import eu.kanade.tachiyomi.util.system.getResourceColor
 import yokai.domain.novelchapter.models.NovelChapter
+import yokai.i18n.MR
+import yokai.util.lang.getString
 
 /**
  * Simple RecyclerView adapter for novel chapters.
@@ -20,6 +25,8 @@ class NovelChapterAdapter(
     private val onChapterClick: (NovelChapter) -> Unit,
     private val onChapterLongClick: (NovelChapter) -> Unit,
     private val onDownloadClick: ((Int) -> Unit)? = null,  // Download button click callback
+    private val onStartDownloadNow: ((Int) -> Unit)? = null,  // Start download now callback
+    private val onRemoveAllDownloads: (() -> Unit)? = null,  // Remove all downloads callback
     private val onSwipeLeft: ((Int) -> Unit)? = null,  // Swipe left callback (mark read/unread)
     private val onSwipeRight: ((Int) -> Unit)? = null,  // Swipe right callback (bookmark)
     private val onSwipeStateChanged: ((Boolean) -> Unit)? = null  // true when swipe is active
@@ -27,6 +34,9 @@ class NovelChapterAdapter(
 
     private var chapters = emptyList<NovelChapter>()
     private var headerView: View? = null
+    private var activeDownloads = emptyMap<Long, DownloadState>()
+    // Tracks chapters that exist on disk as downloaded files (survives app restart)
+    private var downloadedChapterIds = emptySet<Long>()
     
     // Cached colors for performance optimization
     private var cachedBookmarkedColor: Int? = null
@@ -62,7 +72,44 @@ class NovelChapterAdapter(
     }
 
     fun updateChapters(newChapters: List<NovelChapter>) {
+        val oldSize = chapters.size
         chapters = newChapters
+        val startPosition = if (headerView != null) 1 else 0
+        if (oldSize == newChapters.size) {
+            notifyItemRangeChanged(startPosition, chapters.size)
+        } else {
+            notifyDataSetChanged()
+        }
+    }
+    
+    fun updateActiveDownloads(newDownloads: Map<Long, DownloadState>) {
+        activeDownloads = newDownloads
+        val startPosition = if (headerView != null) 1 else 0
+        notifyItemRangeChanged(startPosition, chapters.size)
+    }
+    
+    fun updateDownloadedChapters(newIds: Set<Long>) {
+        downloadedChapterIds = newIds
+        val startPosition = if (headerView != null) 1 else 0
+        notifyItemRangeChanged(startPosition, chapters.size)
+    }
+    
+    fun removeDownloadedChapterId(id: Long) {
+        if (id in downloadedChapterIds) {
+            downloadedChapterIds = downloadedChapterIds - id
+            val position = chapters.indexOfFirst { it.id == id }
+            if (position >= 0) {
+                val adapterPosition = if (headerView != null) position + 1 else position
+                notifyItemChanged(adapterPosition)
+            }
+        }
+    }
+
+    fun removeDownloadedChapterIds(ids: Set<Long>) {
+        if (ids.isEmpty()) return
+        val toRemove = ids.intersect(downloadedChapterIds)
+        if (toRemove.isEmpty()) return
+        downloadedChapterIds = downloadedChapterIds - toRemove
         val startPosition = if (headerView != null) 1 else 0
         notifyItemRangeChanged(startPosition, chapters.size)
     }
@@ -160,13 +207,13 @@ class NovelChapterAdapter(
                 }
             }
             
-            // Download button click handler
+            // Download button click handler - manga-style popup menu
             binding.downloadButton.root.setOnClickListener {
                 val position = bindingAdapterPosition
                 if (position != RecyclerView.NO_POSITION) {
                     val chapterPosition = if (headerView != null) position - 1 else position
                     if (chapterPosition >= 0 && chapterPosition < chapters.size) {
-                        onDownloadClick?.invoke(chapterPosition)
+                        downloadOrRemoveMenu(binding.downloadButton.root, chapterPosition)
                     }
                 }
             }
@@ -216,19 +263,68 @@ class NovelChapterAdapter(
             // Apply subtle background tinting based on chapter status for better visual feedback
             applyChapterStatusTheming(chapter)
             
-            // Apply accent color to download indicator if available
-            accentColor?.let { color ->
-                binding.downloadButton.downloadIcon.imageTintList = ColorStateList.valueOf(color)
-                binding.downloadButton.downloadBorder.imageTintList = ColorStateList.valueOf(color)
-            }
-            
-            // Show download button (TODO: implement actual download functionality)
+            // Show download button with correct state
             binding.downloadButton.root.isVisible = true
-            // Set to default download state for now
-            binding.downloadButton.downloadBorder.isVisible = true
-            binding.downloadButton.downloadIcon.isVisible = true
-            binding.downloadButton.downloadProgress.isVisible = false
-            binding.downloadButton.downloadProgressIndeterminate.isVisible = false
+            val downloadState = activeDownloads[chapter.id]
+            val isDownloadedOnDisk = downloadedChapterIds.contains(chapter.id)
+            val accent = accentColor ?: binding.root.context.getColor(android.R.color.holo_blue_dark)
+            val bgColor = try {
+                binding.root.context.getResourceColor(eu.kanade.tachiyomi.R.attr.background)
+            } catch (_: Exception) {
+                android.graphics.Color.WHITE
+            }
+            when (downloadState) {
+                DownloadState.DOWNLOADING -> {
+                    binding.downloadButton.downloadBorder.isVisible = false
+                    binding.downloadButton.downloadIcon.isVisible = false
+                    binding.downloadButton.downloadProgress.isVisible = false
+                    binding.downloadButton.downloadProgressIndeterminate.isVisible = true
+                    binding.downloadButton.downloadProgressIndeterminate.setIndicatorColor(accent)
+                }
+                DownloadState.COMPLETED -> {
+                    binding.downloadButton.downloadBorder.isVisible = true
+                    binding.downloadButton.downloadBorder.setImageResource(R.drawable.filled_circle)
+                    binding.downloadButton.downloadBorder.imageTintList = ColorStateList.valueOf(accent)
+                    binding.downloadButton.downloadIcon.isVisible = true
+                    binding.downloadButton.downloadIcon.setImageResource(R.drawable.ic_check_24dp)
+                    binding.downloadButton.downloadIcon.imageTintList = ColorStateList.valueOf(bgColor)
+                    binding.downloadButton.downloadProgress.isVisible = false
+                    binding.downloadButton.downloadProgressIndeterminate.isVisible = false
+                }
+                DownloadState.FAILED -> {
+                    binding.downloadButton.downloadBorder.isVisible = true
+                    binding.downloadButton.downloadBorder.setImageResource(R.drawable.border_circle)
+                    binding.downloadButton.downloadBorder.imageTintList = ColorStateList.valueOf(accent)
+                    binding.downloadButton.downloadIcon.isVisible = true
+                    binding.downloadButton.downloadIcon.setImageResource(R.drawable.ic_close_24dp)
+                    binding.downloadButton.downloadIcon.imageTintList = ColorStateList.valueOf(accent)
+                    binding.downloadButton.downloadProgress.isVisible = false
+                    binding.downloadButton.downloadProgressIndeterminate.isVisible = false
+                }
+                else -> {
+                    if (isDownloadedOnDisk) {
+                        // Downloaded on disk but not in active queue (e.g., old download after app restart)
+                        binding.downloadButton.downloadBorder.isVisible = true
+                        binding.downloadButton.downloadBorder.setImageResource(R.drawable.filled_circle)
+                        binding.downloadButton.downloadBorder.imageTintList = ColorStateList.valueOf(accent)
+                        binding.downloadButton.downloadIcon.isVisible = true
+                        binding.downloadButton.downloadIcon.setImageResource(R.drawable.ic_check_24dp)
+                        binding.downloadButton.downloadIcon.imageTintList = ColorStateList.valueOf(bgColor)
+                        binding.downloadButton.downloadProgress.isVisible = false
+                        binding.downloadButton.downloadProgressIndeterminate.isVisible = false
+                    } else {
+                        // NOT_DOWNLOADED or PENDING
+                        binding.downloadButton.downloadBorder.isVisible = true
+                        binding.downloadButton.downloadBorder.setImageResource(R.drawable.border_circle)
+                        binding.downloadButton.downloadBorder.imageTintList = ColorStateList.valueOf(accent)
+                        binding.downloadButton.downloadIcon.isVisible = true
+                        binding.downloadButton.downloadIcon.setImageResource(R.drawable.ic_arrow_downward_24dp)
+                        binding.downloadButton.downloadIcon.imageTintList = ColorStateList.valueOf(accent)
+                        binding.downloadButton.downloadProgress.isVisible = false
+                        binding.downloadButton.downloadProgressIndeterminate.isVisible = false
+                    }
+                }
+            }
         }
         
         /**
@@ -261,8 +357,53 @@ class NovelChapterAdapter(
                 }
             }
         }
+
+        /**
+         * Manga-style download button popup menu.
+         * If not downloaded: starts download immediately.
+         * Otherwise: shows a floating context menu with cancel/delete/start now options.
+         */
+        private fun downloadOrRemoveMenu(downloadButton: View, position: Int) {
+            val chapter = chapters[position]
+            val downloadState = activeDownloads[chapter.id]
+            val isDownloadedOnDisk = downloadedChapterIds.contains(chapter.id)
+
+            if ((downloadState == null && !isDownloadedOnDisk) || downloadState == DownloadState.FAILED) {
+                // Not downloaded or failed - start download directly
+                onDownloadClick?.invoke(position)
+            } else {
+                // Show popup menu
+                downloadButton.post {
+                    val popup = PopupMenu(downloadButton.context, downloadButton)
+                    popup.menuInflater.inflate(R.menu.chapter_download, popup.menu)
+
+                    // Show "Start Now" only if queued/pending
+                    popup.menu.findItem(R.id.action_start).isVisible =
+                        downloadState == DownloadState.PENDING
+
+                    // Change delete item title based on state
+                    val isCompleted = downloadState == DownloadState.COMPLETED ||
+                        (downloadState == null && isDownloadedOnDisk)
+                    if (!isCompleted) {
+                        popup.menu.findItem(R.id.action_delete).title =
+                            downloadButton.context.getString(MR.strings.cancel)
+                    }
+
+                    popup.setOnMenuItemClickListener { item ->
+                        when (item.itemId) {
+                            R.id.action_delete -> onDownloadClick?.invoke(position)
+                            R.id.action_start -> onStartDownloadNow?.invoke(position)
+                            R.id.action_delete_all -> onRemoveAllDownloads?.invoke()
+                        }
+                        true
+                    }
+
+                    popup.show()
+                }
+            }
+        }
     }
-    
+
     /**
      * Creates an ItemTouchHelper for swipe gestures on chapter items.
      * Swipe right: Bookmark/unbookmark chapter

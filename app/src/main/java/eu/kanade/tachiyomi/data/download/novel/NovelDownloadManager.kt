@@ -6,6 +6,7 @@ import eu.kanade.tachiyomi.data.preference.PreferencesHelper
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -15,7 +16,9 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import uy.kohesive.injekt.injectLazy
 import yokai.domain.novel.Novel
+import yokai.domain.storage.StorageManager
 import yokai.source.novel.NovelProviderRegistry
+import org.json.JSONObject
 import java.io.File
 import java.net.URL
 
@@ -43,10 +46,13 @@ data class ChapterDownloadInfo(
  * - Provides download status tracking
  */
 class NovelDownloadManager(private val context: Context) {
-    
+
     private val preferences by injectLazy<PreferencesHelper>()
+    private val storageManager: StorageManager by injectLazy()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val downloadMutex = Mutex()
+    private val processMutex = Mutex()
+    private val notifier = NovelDownloadNotifier(context)
     
     // Download queue and state
     private val _downloadQueue = MutableStateFlow<List<NovelDownload>>(emptyList())
@@ -67,6 +73,12 @@ class NovelDownloadManager(private val context: Context) {
         private const val CHAPTER_FILE_EXTENSION = ".txt"
         private const val MAX_RETRY_COUNT = 3
         private const val RETRY_DELAY_MS = 2000L
+
+        // JSON keys for chapter file format
+        private const val JSON_KEY_VERSION = "v"
+        private const val JSON_KEY_TITLE = "title"
+        private const val JSON_KEY_CONTENT = "content"
+        private const val FILE_FORMAT_VERSION = 1
     }
     
     // ========== Extension functions to convert chapter types ==========
@@ -86,12 +98,21 @@ class NovelDownloadManager(private val context: Context) {
     // ========== Directory and file helpers ==========
     
     /**
-     * Directory structure for downloaded novels
+     * Directory structure for downloaded novels.
+     * Uses the user-configured download location from StorageManager.
      */
     private fun getNovelDirectory(novel: Novel): File {
-        return File(context.filesDir, "novels/${novel.source}/${novel.id}")
+        val downloadsDir = storageManager.getDownloadsDirectory()
+        val basePath = downloadsDir?.filePath ?: context.filesDir.absolutePath
+        // If filePath is a content URI (SAF), fall back to internal storage for File-based ops
+        val safePath = if (basePath.startsWith("content://")) {
+            context.filesDir.absolutePath
+        } else {
+            basePath
+        }
+        return File(safePath, "novels/${novel.source}/${novel.id}")
     }
-    
+
     private fun getChapterFile(novel: Novel, chapterId: Long): File {
         return File(getNovelDirectory(novel), "${chapterId}$CHAPTER_FILE_EXTENSION")
     }
@@ -124,7 +145,7 @@ class NovelDownloadManager(private val context: Context) {
      * Queue chapters for download (for Presenter chapter type)
      */
     fun queueChapters(novel: Novel, chapters: List<PresenterNovelChapter>) {
-        val infos = chapters.map { it.toDownloadInfo() }
+        val infos = chapters.sortedBy { it.chapterNumber }.map { it.toDownloadInfo() }
         queueChapterInfos(novel, infos)
     }
     
@@ -141,7 +162,47 @@ class NovelDownloadManager(private val context: Context) {
     suspend fun deleteChapter(novel: Novel, chapter: PresenterNovelChapter) {
         deleteChapterById(novel, chapter.id, chapter.title)
     }
-    
+
+    /**
+     * Move a chapter to the front of the download queue.
+     */
+    fun startDownloadNow(novel: Novel, chapter: PresenterNovelChapter) {
+        scope.launch {
+            downloadMutex.withLock {
+                val queue = _downloadQueue.value.toMutableList()
+                val index = queue.indexOfFirst { it.chapter.id == chapter.id && it.novel.id == novel.id }
+                if (index >= 0) {
+                    val download = queue.removeAt(index)
+                    if (download.state == DownloadState.PENDING || download.state == DownloadState.FAILED) {
+                        queue.add(0, download.copy(state = DownloadState.PENDING))
+                        _downloadQueue.value = queue
+                        Logger.d(TAG) { "Moved chapter to front of queue: ${chapter.title}" }
+                    }
+                }
+            }
+            startQueueProcessing()
+        }
+    }
+
+    /**
+     * Cancel a pending or downloading chapter.
+     */
+    fun cancelDownload(novel: Novel, chapter: PresenterNovelChapter) {
+        scope.launch {
+            downloadMutex.withLock {
+                val queue = _downloadQueue.value.toMutableList()
+                val index = queue.indexOfFirst { it.chapter.id == chapter.id && it.novel.id == novel.id }
+                if (index >= 0) {
+                    val download = queue.removeAt(index)
+                    Logger.d(TAG) { "Cancelled download: ${download.chapter.title}" }
+                    _downloadQueue.value = queue
+                }
+            }
+            // Clear from active downloads so UI stops spinning
+            _activeDownloads.value = _activeDownloads.value - chapter.id
+        }
+    }
+
     // ========== Public API for DomainNovelChapter (NovelReaderViewModel) ==========
     
     /**
@@ -162,7 +223,7 @@ class NovelDownloadManager(private val context: Context) {
      * Queue chapters for download (for Domain chapter type)
      */
     fun queueDomainChapters(novel: Novel, chapters: List<DomainNovelChapter>) {
-        val infos = chapters.map { it.toDownloadInfo() }
+        val infos = chapters.sortedBy { it.chapterNumber }.map { it.toDownloadInfo() }
         queueChapterInfos(novel, infos)
     }
     
@@ -186,23 +247,58 @@ class NovelDownloadManager(private val context: Context) {
         val file = getChapterFile(novel, chapterId)
         return file.exists() && file.length() > 0
     }
-    
-    private suspend fun getDownloadedContentById(novel: Novel, chapterId: Long): String? = 
+
+    private suspend fun getDownloadedContentById(novel: Novel, chapterId: Long): String? =
         withContext(Dispatchers.IO) {
             val file = getChapterFile(novel, chapterId)
-            if (!file.exists()) return@withContext null
-            
+            val path = file.absolutePath
+
+            if (!file.exists()) {
+                Logger.d(TAG) { "Downloaded file missing for chapter $chapterId at $path" }
+                // LEGACY FALLBACK: clear stale active download state if file is gone
+                if (_activeDownloads.value[chapterId] == DownloadState.COMPLETED) {
+                    _activeDownloads.value = _activeDownloads.value - chapterId
+                    Logger.d(TAG) { "Cleared stale COMPLETED state for missing chapter $chapterId" }
+                }
+                return@withContext null
+            }
+
+            if (file.length() == 0L) {
+                Logger.w(TAG) { "Downloaded file is 0 bytes for chapter $chapterId at $path" }
+                file.delete()
+                _activeDownloads.value = _activeDownloads.value - chapterId
+                return@withContext null
+            }
+
             try {
                 val text = file.readText()
-                // Format: title\n<html content>
-                val firstNewline = text.indexOf('\n')
-                if (firstNewline > 0) {
-                    text.substring(firstNewline + 1)
+
+                // LEGACY SUPPORT: detect old format (plain text or title\ncontent) vs new JSON format
+                val content = if (text.trimStart().startsWith("{")) {
+                    // New JSON format
+                    val json = JSONObject(text)
+                    json.optString(JSON_KEY_CONTENT, "")
                 } else {
-                    text
+                    // Legacy format: title\n<html content> (or plain text)
+                    val firstNewline = text.indexOf('\n')
+                    if (firstNewline > 0) text.substring(firstNewline + 1) else text
                 }
+
+                if (content.isBlank() || content.trimStart().startsWith("Error:")) {
+                    Logger.w(TAG) { "Downloaded file has invalid content for chapter $chapterId at $path (total=${text.length})" }
+                    // Delete corrupted legacy files so they get re-downloaded
+                    file.delete()
+                    _activeDownloads.value = _activeDownloads.value - chapterId
+                    return@withContext null
+                }
+
+                Logger.d(TAG) { "Loaded downloaded content for chapter $chapterId: ${content.length} chars from $path" }
+                content
             } catch (e: Exception) {
-                Logger.e(TAG) { "Failed to read downloaded chapter: ${e.message}" }
+                Logger.e(TAG) { "Failed to read downloaded chapter $chapterId: ${e.message} at $path" }
+                // If we can't parse it (e.g. invalid JSON), delete the file
+                file.delete()
+                _activeDownloads.value = _activeDownloads.value - chapterId
                 null
             }
         }
@@ -227,8 +323,14 @@ class NovelDownloadManager(private val context: Context) {
             // Download cover image in parallel
             downloadPoster(novel)
 
-            // Start processing if not already running
-            if (!_isDownloading.value) {
+            // Always start processing if there are pending downloads
+            startQueueProcessing()
+        }
+    }
+
+    private fun startQueueProcessing() {
+        scope.launch {
+            processMutex.withLock {
                 processQueue()
             }
         }
@@ -258,10 +360,11 @@ class NovelDownloadManager(private val context: Context) {
         }
     }
     
-    private suspend fun downloadChapterInfo(novel: Novel, chapter: ChapterDownloadInfo): Boolean = 
+    private suspend fun downloadChapterInfo(novel: Novel, chapter: ChapterDownloadInfo): Boolean =
         withContext(Dispatchers.IO) {
             updateDownloadState(chapter.id, DownloadState.DOWNLOADING)
-            
+            Logger.d(TAG) { "Starting download for chapter: ${chapter.title} (id=${chapter.id}, url=${chapter.url})" }
+
             try {
                 val provider = NovelProviderRegistry.getProvider(novel.source)
                 if (provider == null) {
@@ -269,21 +372,77 @@ class NovelDownloadManager(private val context: Context) {
                     updateDownloadState(chapter.id, DownloadState.FAILED)
                     return@withContext false
                 }
-                
-                // Fetch content from provider
-                val content = provider.getNovelChapterContent(chapter.url)
-                
-                // Save to file
-                val file = getChapterFile(novel, chapter.id)
-                file.parentFile?.mkdirs()
-                file.writeText("${chapter.title}\n${content.content}")
-                
-                Logger.d(TAG) { "Downloaded chapter: ${chapter.title}" }
-                updateDownloadState(chapter.id, DownloadState.COMPLETED)
-                true
-                
+
+                // Retry loop inspired by QuickNovel's BookDownloader2
+                var lastError: String? = null
+                for (attempt in 0..MAX_RETRY_COUNT) {
+                    // Check if download was cancelled (removed from queue)
+                    val stillQueued = _downloadQueue.value.any { it.chapter.id == chapter.id }
+                    if (!stillQueued && _activeDownloads.value[chapter.id] != DownloadState.DOWNLOADING) {
+                        Logger.d(TAG) { "Download cancelled for ${chapter.title}, aborting retries" }
+                        return@withContext false
+                    }
+
+                    if (attempt > 0) {
+                        Logger.d(TAG) { "Retrying download for ${chapter.title} (attempt $attempt/$MAX_RETRY_COUNT)" }
+                        delay(RETRY_DELAY_MS)
+                    }
+
+                    try {
+                        // Fetch content from provider
+                        Logger.d(TAG) { "Fetching content from provider for: ${chapter.title}" }
+                        val content = provider.getNovelChapterContent(chapter.url)
+                        Logger.d(TAG) { "Received content for ${chapter.title}: length=${content.content.length}, title=${content.title}" }
+
+                        // Detect provider error responses (e.g. "Error: no content returned")
+                        if (content.content.isBlank() || content.content.trimStart().startsWith("Error:")) {
+                            lastError = content.content.takeIf { it.isNotBlank() } ?: "Blank content"
+                            Logger.e(TAG) { "Provider returned invalid content for ${chapter.title}: $lastError" }
+                            continue // retry
+                        }
+
+                        // Save to file as JSON wrapper (prevents newline-in-title corruption)
+                        val file = getChapterFile(novel, chapter.id)
+                        val tempFile = File(file.parentFile, "${file.name}.tmp")
+                        file.parentFile?.mkdirs()
+                        val jsonWrapper = JSONObject().apply {
+                            put(JSON_KEY_VERSION, FILE_FORMAT_VERSION)
+                            put(JSON_KEY_TITLE, chapter.title)
+                            put(JSON_KEY_CONTENT, content.content)
+                        }
+                        tempFile.writeText(jsonWrapper.toString())
+                        tempFile.renameTo(file)
+                        Logger.d(TAG) { "Saved chapter to disk: ${file.absolutePath}, size=${file.length()} bytes" }
+
+                        // Verify file was written correctly
+                        val verifyText = file.readText()
+                        val verifyJson = JSONObject(verifyText)
+                        val verifyContent = verifyJson.optString(JSON_KEY_CONTENT, "")
+                        if (verifyContent.isBlank()) {
+                            lastError = "Verification failed: content was corrupted"
+                            file.delete()
+                            continue // retry
+                        }
+                        Logger.d(TAG) { "Verified saved content: length=${verifyContent.length}" }
+
+                        Logger.d(TAG) { "Downloaded chapter successfully: ${chapter.title}" }
+                        updateDownloadState(chapter.id, DownloadState.COMPLETED)
+                        return@withContext true
+
+                    } catch (e: Exception) {
+                        lastError = e.message
+                        Logger.e(TAG) { "Download attempt $attempt failed for ${chapter.title}: ${e.message}" }
+                        if (attempt == MAX_RETRY_COUNT) break
+                    }
+                }
+
+                Logger.e(TAG) { "All download attempts failed for ${chapter.title}: $lastError" }
+                updateDownloadState(chapter.id, DownloadState.FAILED)
+                false
+
             } catch (e: Exception) {
                 Logger.e(TAG) { "Failed to download chapter ${chapter.title}: ${e.message}" }
+                e.printStackTrace()
                 updateDownloadState(chapter.id, DownloadState.FAILED)
                 false
             }
@@ -293,10 +452,16 @@ class NovelDownloadManager(private val context: Context) {
         try {
             val file = getChapterFile(novel, chapterId)
             if (file.exists()) {
-                file.delete()
-                invalidateEpub(novel)
-                Logger.d(TAG) { "Deleted chapter: $title" }
+                val deleted = file.delete()
+                if (deleted) {
+                    invalidateEpub(novel)
+                    Logger.d(TAG) { "Deleted chapter: $title" }
+                } else {
+                    Logger.w(TAG) { "Failed to delete chapter file (delete returned false): $title at ${file.absolutePath}" }
+                }
             }
+            // Also clear from active downloads so UI updates
+            _activeDownloads.value = _activeDownloads.value - chapterId
         } catch (e: Exception) {
             Logger.e(TAG) { "Failed to delete chapter: ${e.message}" }
         }
@@ -306,34 +471,52 @@ class NovelDownloadManager(private val context: Context) {
      * Process the download queue
      */
     private suspend fun processQueue() {
+        if (_isDownloading.value) return
         _isDownloading.value = true
 
-        while (_downloadQueue.value.isNotEmpty()) {
-            val download = downloadMutex.withLock {
-                _downloadQueue.value.firstOrNull { it.state == DownloadState.PENDING }
-            } ?: break
+        var completedCount = 0
+        var failedCount = 0
+        val totalCount = _downloadQueue.value.count { it.state == DownloadState.PENDING }
 
-            val success = downloadChapterInfo(download.novel, download.chapter)
+        try {
+            while (_downloadQueue.value.any { it.state == DownloadState.PENDING }) {
+                val download = downloadMutex.withLock {
+                    _downloadQueue.value.firstOrNull { it.state == DownloadState.PENDING }
+                } ?: break
 
-            downloadMutex.withLock {
-                val updatedQueue = _downloadQueue.value.toMutableList()
-                val index = updatedQueue.indexOfFirst { it.chapter.id == download.chapter.id }
-                if (index >= 0) {
-                    if (success) {
+                notifier.showProgress(download.novel.title, completedCount, totalCount, download.chapter.title)
+
+                val success = downloadChapterInfo(download.novel, download.chapter)
+
+                if (success) {
+                    completedCount++
+                } else {
+                    failedCount++
+                }
+
+                downloadMutex.withLock {
+                    val updatedQueue = _downloadQueue.value.toMutableList()
+                    val index = updatedQueue.indexOfFirst { it.chapter.id == download.chapter.id }
+                    if (index >= 0) {
+                        // Always remove from queue (success or failure)
+                        // Failed downloads are tracked via _activeDownloads with FAILED state
                         updatedQueue.removeAt(index)
-                    } else {
-                        // Mark as failed but keep in queue for retry
-                        updatedQueue[index] = download.copy(state = DownloadState.FAILED)
+                        _downloadQueue.value = updatedQueue
                     }
-                    _downloadQueue.value = updatedQueue
                 }
             }
+        } finally {
+            _isDownloading.value = false
+
+            if (completedCount > 0 || failedCount > 0) {
+                notifier.showComplete(completedCount, failedCount)
+            } else {
+                notifier.dismiss()
+            }
+
+            // Compile EPUBs for novels that had chapters downloaded
+            compileQueuedEpubs()
         }
-
-        _isDownloading.value = false
-
-        // Compile EPUBs for novels that had chapters downloaded
-        compileQueuedEpubs()
     }
 
     /**
@@ -365,6 +548,7 @@ class NovelDownloadManager(private val context: Context) {
             if (chapterFiles.isEmpty()) return
 
             val posterFile = getPosterFileInternal(novel)
+            val epubFile = getEpubFile(novel)
             NovelEpubCompiler.compile(
                 context = context,
                 novel = novel,
@@ -372,6 +556,7 @@ class NovelDownloadManager(private val context: Context) {
                 synopsis = novel.description,
                 posterFile = posterFile.takeIf { it.exists() },
                 chapterFiles = chapterFiles,
+                epubOutputFile = epubFile,
             )
         } catch (e: Exception) {
             Logger.e(TAG) { "EPUB compilation failed: ${e.message}" }
@@ -420,11 +605,30 @@ class NovelDownloadManager(private val context: Context) {
     }
     
     /**
+     * Get all downloaded chapter IDs for a novel in a single disk scan.
+     * Much faster than calling isChapterDownloaded() per chapter.
+     */
+    fun getDownloadedChapterIds(novel: Novel): Set<Long> {
+        val dir = getNovelDirectory(novel)
+        return dir
+            .listFiles { f -> f.isFile && f.extension == "txt" && f.length() > 0 }
+            ?.mapNotNull { it.nameWithoutExtension.toLongOrNull() }
+            ?.toSet()
+            ?: emptySet()
+    }
+
+    /**
      * Get download count for a novel
      */
     fun getDownloadCount(novel: Novel): Int {
-        val dir = getNovelDirectory(novel)
-        return dir.listFiles()?.count { it.extension == "txt" } ?: 0
+        return getDownloadedChapterIds(novel).size
+    }
+
+    /**
+     * Returns true if the chapter is currently queued or actively downloading.
+     */
+    fun isChapterQueuedOrDownloading(novel: Novel, chapterId: Long): Boolean {
+        return _downloadQueue.value.any { it.novel.id == novel.id && it.chapter.id == chapterId && it.state != DownloadState.COMPLETED }
     }
     
     /**
